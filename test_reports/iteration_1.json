@@ -1,0 +1,84 @@
+{
+  "summary": "LifeScript MVP first pass: backend AI proxy (health, initial-plan, daily-quote, coach-chat, boss-battle, regenerate-mission) works end-to-end with Claude Sonnet 4.5 via Emergent key; frontend onboarding 10 questions flows correctly, home/badges/profile tabs render, coach chat returns personalised reply with working free-tier counter. Two notable issues: (1) EMERGENT_LLM_KEY hits intermittent 'Budget has been exceeded' 400s on heavier calls (initial-plan, boss-battle) causing flaky 500s; retry re-runs succeed. (2) Splash screen button appears below the mobile fold (bounding box y≈916 in 375x667 viewport) and cannot be tapped without scrolling — content overflows viewport due to oversized PulsingOrb + vertical stack.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/ai/initial-plan, /api/ai/boss-battle, /api/ai/regenerate-mission",
+        "issue": "Intermittent 500 via emergentintegrations ChatError -> litellm BadRequestError: 'Budget has been exceeded! Current cost: 0.014, Max budget: 0.001'. Smaller calls (daily-quote, coach-chat) succeed consistently; larger prompts periodically fail. Key may have per-minute or per-call ceiling configured too low.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Splash /app/frontend/app/index.tsx",
+        "issue": "On 375x667 mobile viewport the 'Begin your journey' button renders at y≈916px (below the 667px fold) so it cannot be tapped. The body html reports scrollHeight=667 yet the button sits outside it, indicating the ScreenBg/PulsingOrb stack overflows the flex container on web. User sees only a purple orb and cannot proceed without reducing zoom or scrolling on desktop; on real mobile web it is unreachable.",
+        "testID": "splash-start-btn",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "Splash PulsingOrb",
+        "issue": "Pulsing scale animation uses withRepeat(-1, true) so Playwright scroll_into_view repeatedly fails with 'element is not stable'. Not blocking users but suggests the pulse is continuously retriggering layout. Consider scaling via transform on an inner view only (so outer bounding box stays fixed).",
+        "testID": "splash-start-btn",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Daily quote fetch on splash mount",
+        "issue": "Console: 'quote fetch failed TypeError: Failed to fetch' during splash load — looks like an early fetch fires before the app is fully hydrated/URL resolved, or runs from an unexpected context. Should be awaited after routing is stable or wrapped in try/catch without noisy console.",
+        "affected_testIDs": []
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Global",
+        "issues": [
+          "Console warnings: 'props.pointerEvents is deprecated. Use style.pointerEvents' — update to style prop for RN Web 0.76+.",
+          "Console warnings: 'shadow* style props are deprecated. Use boxShadow' — migrate shadowColor/shadowOffset/... to boxShadow for RN Web."
+        ]
+      },
+      {
+        "screen": "Profile",
+        "issues": [
+          "TestID naming mismatch vs. review-request spec: spec expects profile-referral-btn/profile-edit-goals/profile-pro-row/profile-restart-btn, actual testIDs are profile-invite-btn/settings-edit-goals/settings-pro/settings-reset. Align names so automated tests and documentation stay in sync."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/conftest.py",
+    "/app/backend/tests/test_lifescript_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix splash layout: on mobile web the Begin-your-journey button is not tappable — wrap content in a ScrollView or use SafeAreaView + fixed-height layout; constrain PulsingOrb to a percentage that leaves room for title/tagline/button within 667px.",
+    "Confirm EMERGENT_LLM_KEY budget with Emergent ops — current max_budget=$0.001 is triggering BadRequestError for the heavier initial-plan/boss-battle prompts. Raise or reset the ceiling.",
+    "Harden splash daily-quote fetch: wrap in try/catch + defer until after router.replace decision, and drop the console.warn spam on cold starts.",
+    "Migrate deprecated 'shadow*' and 'pointerEvents' usages to their new counterparts to silence warnings.",
+    "Align profile-screen testIDs with documented spec (profile-referral-btn / profile-edit-goals / profile-pro-row / profile-restart-btn) OR update the spec to match current values."
+  ],
+  "critical_code_review_comments": [
+    "backend/server.py: all endpoints use httpexception + pydantic validation correctly; CORS allow_origins=['*'] is fine for now but consider restricting in production.",
+    "backend/server.py _ask_for_json: good defensive JSON extraction (strip markdown fences + regex {.*} fallback). Consider logging full response when JSONDecode fails, currently logger.error is correct.",
+    "backend/server.py coach_chat: replays only user messages from history into LlmChat; assistant turns are implicitly re-derived by the session — this is acceptable but means assistant context resets if session_id varies. OK for current scope.",
+    "frontend/src/state.ts: single AsyncStorage key strategy is clean; however JSON.stringify of full State blob will grow unbounded with coachHistory — add a cap (e.g. last 50 messages).",
+    "frontend/app/index.tsx: PulsingOrb uses Dimensions.get('window').width * 0.55 (= 206px on 375). Combined with title 52pt, tagline 48pt, button ~75pt plus margins this exceeds 667 in practice on web — the root cause of the off-screen button."
+  ],
+  "updated_files": [
+    "/app/backend/tests/conftest.py (new)",
+    "/app/backend/tests/test_lifescript_api.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11) on retry; ~45% (5/11) during first run due to intermittent budget errors",
+    "frontend": "~85% — onboarding 10 questions, home tabs, coach chat all verified; splash start-button unreachable on mobile viewport is the main blocker"
+  },
+  "seed_data_creation": "Seeded localStorage key '@lifescript_state_v1' with an already-onboarded Aria profile (xp=120, streak=2, 1 badge, 1 open Career mission) to reach /(tabs) and /coach without running the AI-backed generating flow.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Pytest suite at /app/backend/tests/test_lifescript_api.py is reusable; EXPO_PUBLIC_BACKEND_URL is read from /app/frontend/.env inside conftest. If backend tests flake with 'Budget has been exceeded' retry after ~30s — it's the Emergent key throttle, not a code bug. For frontend E2E, seed @lifescript_state_v1 in localStorage to skip onboarding; testIDs used: splash-start-btn, onboarding-{name,age,country,dream,obstacle,vision}-input, onboarding-hours-{0.5..4}, onboarding-focus-Career, onboarding-income-Medium, onboarding-style-Fast wins, onboarding-next-btn, tab-home/badges/profile, home-today-mission, home-coach-fab, home-share-btn, coach-input, coach-send-btn, profile-avatar-btn, profile-invite-btn, settings-edit-goals, settings-pro, settings-reset. Note: clicking splash-start-btn via Playwright hangs due to infinite pulse animation — use page.evaluate(() => el.click()) instead of ElementHandle.click.",
+  "rca_of_issue": "Splash button below fold: PulsingOrb at 206px + 24 margin + title 52pt + 12 + tagline 2-line ~48pt + 56 + button 55pt + 18 + sub-row 20pt ≈ 491 minimum. With React Native Web's default line-heights and font inflation the stack renders taller than 667px. Because the root uses flex:1 justifyContent:'center' with no ScrollView, overflow is clipped and the button ends up outside the visible area (reported y≈916). Mitigation: wrap root in ScrollView with contentContainerStyle flexGrow:1 justifyContent:'center', or reduce PulsingOrb size to width*0.4 and tighten tagline marginBottom."
+}
