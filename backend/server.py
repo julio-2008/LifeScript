@@ -170,16 +170,25 @@ def _new_chat(system_message: str, session_id: Optional[str] = None) -> LlmChat:
 
 
 async def _ask_for_json(system_message: str, user_text: str) -> dict:
-    chat = _new_chat(system_message)
-    response = await chat.send_message(UserMessage(text=user_text))
-    try:
-        return json.loads(_strip_json(response))
-    except json.JSONDecodeError as exc:
-        logger.error("Claude returned invalid JSON: %s", response)
-        raise HTTPException(
-            status_code=502,
-            detail=f"AI returned invalid JSON: {exc}",
-        )
+    """Single-shot JSON request with one retry on transient errors."""
+    last_err: Optional[Exception] = None
+    for attempt in range(2):
+        chat = _new_chat(system_message)
+        try:
+            response = await chat.send_message(UserMessage(text=user_text))
+        except Exception as exc:  # noqa: BLE001 — surface only on final attempt
+            last_err = exc
+            continue
+        try:
+            return json.loads(_strip_json(response))
+        except json.JSONDecodeError as exc:
+            last_err = exc
+            logger.error("Claude returned invalid JSON (attempt %s): %s", attempt + 1, response)
+            # retry once more for malformed JSON
+    raise HTTPException(
+        status_code=502,
+        detail=f"AI request failed: {last_err}",
+    )
 
 
 def _profile_summary(profile: UserProfile) -> str:

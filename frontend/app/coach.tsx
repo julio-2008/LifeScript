@@ -70,9 +70,11 @@ export default function CoachScreen() {
         session_id: state.coachSession,
       });
       const reply = { role: 'assistant' as const, content: res.reply };
+      // Cap coach history to the last 50 messages to keep AsyncStorage small.
+      const merged = [...newHistory, reply];
       const next = {
         ...updated,
-        coachHistory: [...newHistory, reply],
+        coachHistory: merged.length > 50 ? merged.slice(-50) : merged,
         coachSession: res.session_id,
       };
       await saveState(next);

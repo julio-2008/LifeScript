@@ -1,6 +1,7 @@
 // Splash / Welcome screen.
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, {
   useSharedValue,
@@ -71,33 +72,42 @@ export default function Splash() {
     return <ScreenBg><View style={{ flex: 1 }} /></ScreenBg>;
   }
 
+  // Cap orb so the full layout fits inside common mobile heights (e.g. 667).
+  const orbSize = Math.min(width * 0.5, 200);
+
   return (
     <ScreenBg>
-      <View style={styles.root}>
-        <Animated.View style={[styles.logoWrap, logoStyle]}>
-          <PulsingOrb size={width * 0.55} />
-        </Animated.View>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <Animated.View style={[styles.logoWrap, logoStyle]}>
+            <PulsingOrb size={orbSize} />
+          </Animated.View>
 
-        <Animated.Text style={[styles.title, titleStyle]} testID="splash-title">
-          LifeScript
-        </Animated.Text>
+          <Animated.Text style={[styles.title, titleStyle]} testID="splash-title">
+            LifeScript
+          </Animated.Text>
 
-        <Animated.Text style={[styles.tagline, taglineStyle]} testID="splash-tagline">
-          Your life. Scripted by you.{'\n'}Powered by AI.
-        </Animated.Text>
+          <Animated.Text style={[styles.tagline, taglineStyle]} testID="splash-tagline">
+            Your life. Scripted by you.{'\n'}Powered by AI.
+          </Animated.Text>
 
-        <Animated.View style={[styles.buttonWrap, buttonStyle]}>
-          <PrimaryButton
-            label="Begin your journey"
-            icon="arrow-forward"
-            testID="splash-start-btn"
-            onPress={() => router.push('/onboarding')}
-          />
-          <View style={styles.subRow}>
-            <Ionicons name="shield-checkmark" size={14} color={colors.textDim} />
-            <Text style={styles.subTxt}>Private. Personal. Powered by Claude.</Text>
-          </View>
-        </Animated.View>
+          <Animated.View style={[styles.buttonWrap, buttonStyle]}>
+            <PrimaryButton
+              label="Begin your journey"
+              icon="arrow-forward"
+              testID="splash-start-btn"
+              onPress={() => router.push('/onboarding')}
+            />
+            <View style={styles.subRow}>
+              <Ionicons name="shield-checkmark" size={14} color={colors.textDim} />
+              <Text style={styles.subTxt}>Private. Personal. Powered by Claude.</Text>
+            </View>
+          </Animated.View>
+        </ScrollView>
 
         <View style={styles.bottomGradient} pointerEvents="none">
           <LinearGradient
@@ -105,31 +115,37 @@ export default function Splash() {
             style={{ flex: 1 }}
           />
         </View>
-      </View>
+      </SafeAreaView>
     </ScreenBg>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  logoWrap: { marginBottom: 24 },
+  scroll: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+  },
+  logoWrap: { marginBottom: 18 },
   title: {
-    fontSize: 52,
+    fontSize: 48,
     fontWeight: '800',
     color: colors.text,
     letterSpacing: -1.5,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   tagline: {
-    fontSize: 17,
+    fontSize: 16,
     color: colors.textAccent,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 56,
+    lineHeight: 22,
+    marginBottom: 36,
     letterSpacing: 0.3,
   },
-  buttonWrap: { width: '100%', alignItems: 'center' },
-  subRow: { flexDirection: 'row', alignItems: 'center', marginTop: 18, gap: 6 },
+  buttonWrap: { width: '100%', alignItems: 'center', maxWidth: 360 },
+  subRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14, gap: 6 },
   subTxt: { color: colors.textDim, fontSize: 12, marginLeft: 6 },
   bottomGradient: {
     position: 'absolute',
