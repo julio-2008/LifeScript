@@ -1,0 +1,128 @@
+{
+  "theme": "dark",
+  "archetype": "7 (Electric & Neon / Cosmic Gamified)",
+  "design_philosophy": "RPG Gamification meets high-end life coaching. The app should feel immersive, premium, and magical, using deep cosmic aesthetics with vibrant game-like elements (XP, Levels, Boss Battles). Every interaction should feel satisfying and polished like a top-tier mobile game.",
+  "colors": {
+    "background": {
+      "base": "#0A0A1A",
+      "surface": "#121226",
+      "surface_glass": "rgba(255, 255, 255, 0.03)",
+      "surface_glass_hover": "rgba(255, 255, 255, 0.08)"
+    },
+    "brand": {
+      "primary": "#7C3AED",
+      "primary_glow": "rgba(124, 58, 237, 0.5)",
+      "xp_gold": "#F59E0B",
+      "health_green": "#10B981",
+      "danger_red": "#EF4444"
+    },
+    "text": {
+      "primary": "#F9FAFB",
+      "secondary": "#9CA3AF",
+      "accent": "#C4B5FD",
+      "inverse": "#000000"
+    },
+    "border": {
+      "subtle": "rgba(255, 255, 255, 0.1)",
+      "active": "rgba(124, 58, 237, 0.3)"
+    }
+  },
+  "typography": {
+    "font_family": {
+      "heading": "Sora",
+      "body": "Inter",
+      "mono": "Space Mono"
+    },
+    "scale": {
+      "h1": { "size": "36px", "lineHeight": "42px", "weight": "800", "tracking": "-1px" },
+      "h2": { "size": "28px", "lineHeight": "34px", "weight": "700", "tracking": "-0.5px" },
+      "h3": { "size": "22px", "lineHeight": "28px", "weight": "600", "tracking": "0" },
+      "h4": { "size": "18px", "lineHeight": "24px", "weight": "600", "tracking": "0" },
+      "body_lg": { "size": "16px", "lineHeight": "24px", "weight": "400", "tracking": "0" },
+      "body": { "size": "14px", "lineHeight": "20px", "weight": "400", "tracking": "0" },
+      "small": { "size": "12px", "lineHeight": "16px", "weight": "500", "tracking": "0.5px", "textTransform": "uppercase" }
+    }
+  },
+  "spacing": {
+    "xs": "4px",
+    "sm": "8px",
+    "md": "16px",
+    "lg": "24px",
+    "xl": "32px",
+    "xxl": "48px"
+  },
+  "radii": {
+    "sm": "8px",
+    "md": "12px",
+    "lg": "16px",
+    "xl": "24px",
+    "full": "9999px"
+  },
+  "shadows": {
+    "glow_primary": "0 0 20px rgba(124, 58, 237, 0.4)",
+    "glow_gold": "0 0 20px rgba(245, 158, 11, 0.4)",
+    "card": "0 4px 24px rgba(0, 0, 0, 0.4)"
+  },
+  "components": {
+    "glass_card": {
+      "implementation": "Expo BlurView (intensity 20, tint dark) wrapped in a View with borderRadius xl, borderWidth 1, borderColor border.subtle, and overflow hidden.",
+      "usage": "Use for the Life Map widgets, mission cards, and profile sections."
+    },
+    "primary_button": {
+      "implementation": "TouchableOpacity with linear gradient background (Primary to darker shade), borderRadius full, and shadow glow_primary. Text should be Sora, bold, uppercase.",
+      "usage": "Main actions like 'Start Mission', 'Level Up', 'Upgrade Pro'."
+    },
+    "circular_progress": {
+      "implementation": "react-native-svg with a background circle (rgba 255,255,255,0.1) and an animated strokeDashoffset for the foreground circle (accent color).",
+      "usage": "6 Life Area Rings on the Home Map."
+    },
+    "text_input": {
+      "implementation": "View with background surface_glass, borderWidth 1, borderColor border.subtle, borderRadius lg, padding lg, text size body_lg.",
+      "usage": "Onboarding answers, free text inputs."
+    }
+  },
+  "animation_specs": {
+    "library": "react-native-reanimated",
+    "page_transition": "Fade and slightly scale up (0.95 -> 1.0) on mount using enter animations.",
+    "button_press": "Scale down to 0.95 using withSpring.",
+    "level_up": "Use react-native-confetti-rig or build a custom particle emitter using Reanimated to shower gold and purple particles.",
+    "pulse_orb": "Continuous withRepeat(withTiming(), -1, true) scale and opacity animation for the generating screen.",
+    "progress_fill": "withTiming(value, { duration: 1500, easing: Easing.out(Easing.cubic) }) for life scores and XP bars."
+  },
+  "screens": {
+    "splash": "Deep space background, animated logo from particles, pulsing 'Start' button.",
+    "onboarding": "One question per screen. Large inputs. Smooth transitions. Progress bar at top.",
+    "generating_animation": "Pulsing orb image in center, starfield background, 'Generating your LifeScript...' fading in and out.",
+    "home_life_map": "Header with Streak/XP, Bento-style glass cards for Today's Mission (span full), Weekly Quest, 6 Progress Rings grid, and AI Quote.",
+    "mission_view": "Focused timer UI. Green/Purple accents. Complete button triggers confetti.",
+    "profile": "Avatar at top, level/XP prominent, grid of badges.",
+    "share_card": "Wrapped-style layout. Vertical cosmic background, oversized typography, data vis of life score.",
+    "pro_upgrade": "Split screen layout. Gray/Blurred without Pro vs Vibrant Color/Particles with Pro. Countdown timer prominent."
+  },
+  "assets": {
+    "images": {
+      "deep_space_bg": "https://images.unsplash.com/photo-1693834069271-e5013fb8ede2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwxfHxkZWVwJTIwc3BhY2UlMjBzdGFycyUyMGdhbGF4eXxlbnwwfHx8fDE3NzczMjMwNDR8MA&ixlib=rb-4.1.0&q=85",
+      "abstract_cosmic_wrapped": "https://images.unsplash.com/photo-1762716514222-996318bb41a7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzOTB8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGNvbG9yZnVsJTIwY29zbWljJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3NzczMjMwNDR8MA&ixlib=rb-4.1.0&q=85",
+      "pulsing_orb": "https://images.pexels.com/photos/11364168/pexels-photo-11364168.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "gold_badge": "https://images.unsplash.com/photo-1624538354543-725a56097519?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNTl8MHwxfHNlYXJjaHwxfHxnb2xkJTIwbWVkYWwlMjBiYWRnZSUyMGRhcmt8ZW58MHx8fHwxNzc3MzIzMDQ0fDA&ixlib=rb-4.1.0&q=85"
+    },
+    "icons": {
+      "library": "@expo/vector-icons",
+      "primary_set": "Ionicons",
+      "secondary_set": "MaterialCommunityIcons"
+    }
+  },
+  "testing": {
+    "requirements": "All interactive elements (buttons, inputs, tabs) MUST include a data-testid attribute for automated testing. Example: testID='start-mission-button'"
+  },
+  "instructions_to_main_agent": [
+    "Build standard React Native (.js) components. Do not use Next.js or HTML tags (div, span).",
+    "Install 'expo-blur', 'expo-linear-gradient', 'react-native-reanimated', 'react-native-svg', and '@expo-google-fonts/sora' & 'inter' if not present.",
+    "Ensure the app is mobile-first, targeting a base width of 390px (use Dimensions API or standard RN flexbox).",
+    "Use standard React Native StyleSheet for styling, referencing the colors and scales provided in this JSON.",
+    "Implement the 'Glass Card' effect heavily for all modular UI blocks on the Home/Life Map screen.",
+    "Ensure 60fps animations for transitions, pulsing elements, and progress bars using react-native-reanimated.",
+    "Do NOT use text emojis as icons (except for the avatar picker and streak fire). Use vector-icons exclusively.",
+    "Bind data-testid/testID to all touchables for test automation."
+  ]
+}
