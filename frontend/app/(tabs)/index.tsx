@@ -1,47 +1,28 @@
-// Home / Life Map — the main screen of LifeScript.
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+// LifeScript 2.0 Home — constellation + dynamic mission board + chapter system.
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
   Dimensions,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withRepeat,
-  withSequence,
-  withDelay,
-  Easing,
+  useSharedValue, useAnimatedStyle, withTiming, withRepeat, withSequence, Easing,
 } from 'react-native-reanimated';
 
 import {
-  ScreenBg,
-  GlassCard,
-  CircularProgress,
-  PrimaryButton,
-  SectionTitle,
+  ScreenBg, GlassCard, SectionTitle, PrimaryButton, ConstellationMap, TypingText,
 } from '../../src/ui';
-import { colors, areaColors } from '../../src/theme';
+import { colors, areaColors, areaIcons, LIFE_AREAS as THEME_AREAS } from '../../src/theme';
 import {
-  loadState,
-  saveState,
-  todayKey,
-  dayDiff,
-  lifeScore,
-  State,
-  StoredMission,
+  loadState, saveState, todayKey, dayDiff, lifeScore, dayIndexSinceJoin,
+  LIFE_AREAS, State, StoredMission,
 } from '../../src/state';
-import { LEVELS, levelForXP, nextLevel, progressToNext } from '../../src/levels';
-import { generateDailyQuote } from '../../src/api';
-import { awardBadge } from '../../src/badges';
+import { levelForXP, nextLevel, progressToNext, eraFor } from '../../src/levels';
+import { api } from '../../src/api';
+import { scheduleAll } from '../../src/notify';
+import { Sounds } from '../../src/sounds';
 
 const { width } = Dimensions.get('window');
 
@@ -49,82 +30,101 @@ export default function Home() {
   const router = useRouter();
   const [state, setState] = useState<State | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [challenge, setChallenge] = useState<{ title: string; description: string; participants: number } | null>(null);
 
   const refresh = useCallback(async () => {
     const s = await loadState();
-    if (!s.onboarded || !s.profile) {
-      router.replace('/');
-      return;
-    }
-    // Streak guard — if we missed a day, drop the streak (with shield).
+    if (!s.onboarded || !s.profile) { router.replace('/'); return; }
+
+    // Streak guard — if we missed a day, drop the streak (unless a shield is available).
+    let next = s;
     if (s.lastCompletionDate) {
       const diff = dayDiff(s.lastCompletionDate, todayKey());
       if (diff >= 2) {
         if (s.shields > 0) {
-          await saveState({ ...s, shields: s.shields - 1, lastCompletionDate: todayKey() });
+          next = { ...s, shields: s.shields - 1, lastCompletionDate: todayKey() };
+          await saveState(next);
         } else if (s.streak > 0) {
-          await saveState({ ...s, streak: 0 });
+          next = { ...s, streak: 0 };
+          await saveState(next);
+          Sounds.streakBreak();
         }
       }
     }
 
-    // Daily quote refresh.
-    if (s.dailyQuoteDate !== todayKey() && s.profile) {
+    // Daily quote refresh
+    if (next.dailyQuoteDate !== todayKey() && next.profile) {
       try {
-        const q = await generateDailyQuote(s.profile, s.streak);
-        const updated = { ...s, dailyQuote: q.quote, dailyQuoteDate: todayKey() };
-        await saveState(updated);
-        setState(updated);
-        return;
-      } catch (e) {
-        console.warn('quote fetch failed', e);
-      }
+        const q = await api.dailyQuote(next.profile, next.streak);
+        next = { ...next, dailyQuote: q.quote, dailyQuoteDate: todayKey() };
+        await saveState(next);
+      } catch {}
     }
-    setState(await loadState());
+    setState(next);
+
+    // Try the global daily challenge (non-blocking).
+    try {
+      const c = await api.dailyChallenge(todayKey());
+      setChallenge({ title: c.title, description: c.description, participants: c.participants });
+    } catch {}
+
+    // Schedule notifications (non-blocking).
+    if (next.notificationsEnabled && next.profile) {
+      const todayMission = next.missions.find((m) => m.date === todayKey() && !m.completed);
+      scheduleAll(next.profile.name, todayMission?.title, next.streak).catch(() => {});
+    }
   }, [router]);
 
-  useFocusEffect(
-    useCallback(() => {
-      refresh();
-    }, [refresh]),
-  );
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
-  if (!state || !state.profile) {
-    return <ScreenBg><View style={{ flex: 1 }} /></ScreenBg>;
-  }
+  if (!state || !state.profile) return <ScreenBg><View style={{ flex: 1 }} /></ScreenBg>;
 
   const today = todayKey();
-  const todayMission = state.missions.find((m) => m.date === today && !m.completed)
-    ?? state.missions.find((m) => !m.completed)
-    ?? state.missions[0];
+  const dayIdx = dayIndexSinceJoin(state);
+  const chapter = Math.min(4, Math.max(1, dayIdx));
+
+  // Is the user gated by chapters? Day 4+ and not pro → show chapter gate on the home, not inline.
+  const gated = chapter >= 4 && !state.pro;
+
+  const openMissions = state.missions.filter((m) => !m.completed);
+  const todayMission = state.missions.find((m) => m.date === today && !m.completed) ?? openMissions[0];
+  const sideQuests = openMissions.filter((m) => m !== todayMission).slice(0, 2);
 
   const completedToday = !!state.missions.find((m) => m.date === today && m.completed);
   const level = levelForXP(state.xp);
-  const next = nextLevel(state.xp);
+  const era = eraFor(level);
+  const nxt = nextLevel(state.xp);
   const lvlProgress = progressToNext(state.xp);
   const score = lifeScore(state);
 
   const greeting = (() => {
     const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 18) return 'Good afternoon';
-    return 'Good evening';
+    if (h < 12) return 'Bom dia';
+    if (h < 18) return 'Boa tarde';
+    return 'Boa noite';
   })();
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await refresh();
-    setRefreshing(false);
-  };
+  const nodes = LIFE_AREAS.map((area, i) => {
+    const angle = (360 / LIFE_AREAS.length) * i - 90;
+    const unlocked = (area !== 'Purpose' && area !== 'Legacy') || level.id >= 5;
+    return {
+      id: area,
+      label: area,
+      value: unlocked ? (state.areas[area] ?? 0) : 0,
+      color: areaColors[area],
+      angle,
+      radius: Math.min(width, 360) * 0.36,
+    };
+  });
+
+  const onRefresh = async () => { setRefreshing(true); await refresh(); setRefreshing(false); };
 
   return (
-    <ScreenBg>
+    <ScreenBg gradient={['#080818', era.palette.bg, '#04040C'] as const}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -132,137 +132,178 @@ export default function Home() {
             <Text style={styles.greeting} testID="home-greeting">
               {greeting}, {state.profile.name}.
             </Text>
-            <Text style={styles.subGreeting}>Your journey continues.</Text>
+            <Text style={styles.subGreeting}>Capítulo {chapter} · Dia {dayIdx}</Text>
           </View>
           <StreakBadge streak={state.streak} testID="home-streak" />
         </View>
 
-        {/* XP / Level card */}
-        <GlassCard style={styles.levelCard}>
-          <View style={styles.levelTop}>
-            <View style={[styles.levelIconBg, { backgroundColor: `${level.color}22`, borderColor: level.color }]}>
-              <Ionicons name={level.icon as any} size={28} color={level.color} />
+        {/* Level + Era */}
+        <GlassCard style={{ paddingVertical: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={[styles.levelCircle, { backgroundColor: `${era.palette.accent}20`, borderColor: era.palette.accent }]}>
+              <Text style={[styles.levelNum, { color: era.palette.accent }]}>{level.id}</Text>
             </View>
             <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={styles.levelLabel}>LEVEL {level.id}</Text>
-              <Text style={styles.levelName} testID="home-level-name">{level.name}</Text>
+              <Text style={styles.eraName}>{era.name.toUpperCase()}</Text>
+              <Text style={styles.levelTitle} testID="home-level-name">{level.name}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.xpNumber} testID="home-xp">{state.xp} XP</Text>
-              <Text style={styles.xpNext}>
-                {next ? `${next.minXP - state.xp} to ${next.name}` : 'Max level'}
-              </Text>
+              <Text style={styles.xp} testID="home-xp">{state.xp} XP</Text>
+              <Text style={styles.xpNext}>{nxt ? `${nxt.minXP - state.xp} até ${nxt.name}` : 'Máx'}</Text>
             </View>
           </View>
           <View style={styles.xpBarBg}>
             <LinearGradient
-              colors={[level.color, colors.primary]}
+              colors={[era.palette.accent, colors.primary]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={[styles.xpBarFill, { width: `${lvlProgress * 100}%` }]}
             />
           </View>
-          <Text style={styles.levelTagline}>{level.tagline}</Text>
+          <Text style={styles.tagline}>{level.tagline}</Text>
         </GlassCard>
 
-        {/* Today's mission */}
-        <SectionTitle style={{ marginTop: 24 }}>Today's mission</SectionTitle>
+        {/* Constellation Life Map */}
+        <SectionTitle style={{ marginTop: 24 }}>Seu mapa de vida</SectionTitle>
+        <GlassCard tint="rgba(124,58,237,0.06)" style={{ paddingVertical: 18 }}>
+          <ConstellationMap
+            size={Math.min(width, 360) - 48}
+            nodes={nodes}
+            centerLabel={`${score}`}
+            centerSub="LIFE SCORE"
+            onNodePress={(id) => router.push({ pathname: '/area/[name]', params: { name: id } })}
+          />
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 6 }}>
+            <TouchableOpacity
+              testID="home-share-btn"
+              onPress={() => router.push('/share')}
+              style={styles.sharePill}
+            >
+              <Ionicons name="share-social" size={14} color={colors.text} />
+              <Text style={styles.sharePillTxt}>  Compartilhar mapa</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="home-timeline-btn"
+              onPress={() => router.push('/timeline')}
+              style={[styles.sharePill, { marginLeft: 8 }]}
+            >
+              <Ionicons name="time" size={14} color={colors.text} />
+              <Text style={styles.sharePillTxt}>  Linha do tempo</Text>
+            </TouchableOpacity>
+          </View>
+        </GlassCard>
+
+        {/* Chapter gate on day 4+ for free users */}
+        {gated && <ChapterGate state={state} onOpen={() => router.push('/chapter')} />}
+
+        {/* Main Quest */}
+        <SectionTitle style={{ marginTop: 24 }} right={
+          <TouchableOpacity onPress={() => router.push('/archive')} testID="home-archive-btn">
+            <Text style={styles.linkTxt}>Arquivo ›</Text>
+          </TouchableOpacity>
+        }>Missão principal</SectionTitle>
         {todayMission ? (
           <MissionCard
+            kind="main"
             mission={todayMission}
             completed={completedToday}
             onPress={() => router.push({ pathname: '/mission', params: { id: todayMission.id } })}
           />
         ) : (
-          <GlassCard><Text style={styles.dim}>No mission today. Take a rest.</Text></GlassCard>
+          <GlassCard><Text style={styles.dim}>Nenhuma missão aberta. Descanse hoje.</Text></GlassCard>
         )}
 
-        {/* Daily quote */}
+        {/* Side Quests */}
+        {sideQuests.length > 0 && (
+          <>
+            <SectionTitle style={{ marginTop: 20 }}>Missões paralelas</SectionTitle>
+            {sideQuests.map((m) => (
+              <MissionCard key={m.id} kind="side" mission={m} completed={false}
+                onPress={() => router.push({ pathname: '/mission', params: { id: m.id } })} />
+            ))}
+          </>
+        )}
+
+        {/* Daily Challenge */}
+        {challenge && (
+          <>
+            <SectionTitle style={{ marginTop: 20 }}>Hoje, ao redor do mundo</SectionTitle>
+            <GlassCard tint="rgba(245,158,11,0.06)" testID="home-daily-challenge">
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={[styles.challengeIcon, { backgroundColor: 'rgba(245,158,11,0.14)' }]}>
+                  <Ionicons name="flame" size={22} color={colors.gold} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.mainTitle}>{challenge.title}</Text>
+                  <Text style={styles.mainDesc} numberOfLines={2}>{challenge.description}</Text>
+                </View>
+              </View>
+              <Text style={styles.participants}>{challenge.participants.toLocaleString()} LifeScripters estão nessa hoje.</Text>
+            </GlassCard>
+          </>
+        )}
+
+        {/* Daily Quote */}
         {state.dailyQuote ? (
           <GlassCard style={{ marginTop: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+            <View style={{ flexDirection: 'row' }}>
               <Ionicons name="sparkles" size={18} color={colors.gold} />
-              <Text style={styles.quote} testID="home-quote">  {state.dailyQuote}</Text>
+              <TypingText
+                text={'  ' + state.dailyQuote}
+                style={styles.quote}
+                testID="home-quote"
+              />
             </View>
+            <TouchableOpacity onPress={() => Sounds.speak(state.dailyQuote)} style={{ marginTop: 10 }} testID="home-speak-btn">
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="volume-medium" size={14} color={colors.textAccent} />
+                <Text style={{ color: colors.textAccent, fontSize: 12, marginLeft: 6 }}>Ouvir</Text>
+              </View>
+            </TouchableOpacity>
           </GlassCard>
         ) : null}
 
-        {/* Weekly Quest */}
-        <SectionTitle style={{ marginTop: 28 }}>Weekly quest</SectionTitle>
-        {state.weeklyQuest && (
-          <GlassCard testID="home-weekly-quest">
-            <Text style={styles.wqTitle}>{state.weeklyQuest.title}</Text>
-            <Text style={styles.wqDesc}>{state.weeklyQuest.description}</Text>
-            <View style={styles.wqDots}>
-              {state.weeklyQuest.progress.map((done, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.wqDot,
-                    done && { backgroundColor: colors.gold, borderColor: colors.gold },
-                  ]}
-                >
-                  <Text style={[styles.wqDotTxt, done && { color: '#000' }]}>{i + 1}</Text>
-                </View>
-              ))}
-            </View>
-          </GlassCard>
-        )}
-
-        {/* Life areas */}
-        <SectionTitle style={{ marginTop: 28 }}>Life areas</SectionTitle>
-        <View style={styles.areasGrid}>
-          {Object.entries(state.areas).map(([area, val]) => (
-            <View key={area} style={styles.areaItem}>
-              <CircularProgress progress={val} color={areaColors[area]} size={86} stroke={6}>
-                <Ionicons
-                  name={iconForArea(area)}
-                  size={24}
-                  color={areaColors[area]}
-                />
-              </CircularProgress>
-              <Text style={styles.areaLabel}>{area}</Text>
-              <Text style={styles.areaPct}>{Math.round(val * 100)}%</Text>
-            </View>
-          ))}
+        {/* Daily Spin + quick actions */}
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 24 }}>
+          <QuickAction icon="refresh-circle" label="Roleta Diária" onPress={() => router.push('/spin')} testID="home-spin-btn" gradient={['#7C3AED', '#EC4899']} />
+          <QuickAction icon="flash" label="Foco" onPress={() => router.push('/focus')} testID="home-focus-btn" gradient={['#0D9488', '#10B981']} />
+          <QuickAction icon="card" label="Identidade" onPress={() => router.push('/identity')} testID="home-identity-btn" gradient={['#F59E0B', '#B45309']} />
         </View>
 
-        {/* Life Score */}
-        <GlassCard style={{ marginTop: 24, alignItems: 'center', paddingVertical: 22 }}>
-          <Text style={styles.scoreLabel}>YOUR LIFE SCORE</Text>
-          <Text style={styles.scoreNumber} testID="home-life-score">{score}</Text>
-          <Text style={styles.scoreSub}>out of 1000</Text>
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-            <PrimaryButton
-              label="Share my map"
-              icon="share-social"
-              testID="home-share-btn"
-              onPress={() => router.push('/share')}
-            />
-          </View>
-        </GlassCard>
+        {/* Boss prompt */}
+        {state.totalMissionsDone >= 5 && (
+          <TouchableOpacity testID="home-boss-prompt" onPress={() => router.push('/boss')} activeOpacity={0.85}>
+            <GlassCard style={{ marginTop: 20 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="skull" size={26} color="#F43F5E" />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.bossTitle}>Boss Battle pronta</Text>
+                  <Text style={styles.bossSub}>3 dias. Uma medalha rara. Uma virada.</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+              </View>
+            </GlassCard>
+          </TouchableOpacity>
+        )}
 
-        {/* Boss battle prompt */}
-        <BossPrompt state={state} />
-
-        {/* Pro upgrade banner (if free) */}
-        {!state.pro && (
+        {/* Pro banner for non-pros */}
+        {!state.pro && chapter < 4 && (
           <TouchableOpacity
             testID="home-upgrade-banner"
             onPress={() => router.push('/upgrade')}
             activeOpacity={0.85}
-            style={{ marginTop: 24 }}
+            style={{ marginTop: 18 }}
           >
             <LinearGradient
-              colors={['#7C3AED', '#EC4899']}
+              colors={['#7C3AED', '#EC4899', '#F59E0B']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={styles.proBanner}
             >
-              <Ionicons name="diamond" size={26} color="#fff" />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.proTitle}>Unlock LifeScript Pro</Text>
-                <Text style={styles.proSub}>Boss Battles, unlimited coach, shields…</Text>
+              <Ionicons name="diamond" size={22} color="#fff" />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.proTitle}>O Capítulo 4 aguarda</Text>
+                <Text style={styles.proSub}>Desbloqueie seu LifeScript completo.</Text>
               </View>
-              <Ionicons name="arrow-forward" size={20} color="#fff" />
+              <Ionicons name="arrow-forward" size={18} color="#fff" />
             </LinearGradient>
           </TouchableOpacity>
         )}
@@ -270,35 +311,15 @@ export default function Home() {
         <View style={{ height: 140 }} />
       </ScrollView>
 
-      {/* Floating coach button */}
-      <TouchableOpacity
-        testID="home-coach-fab"
-        onPress={() => router.push('/coach')}
-        style={styles.fab}
-        activeOpacity={0.85}
-      >
-        <LinearGradient
-          colors={['#7C3AED', '#5B21B6']}
-          style={styles.fabInner}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        >
+      {/* Axiom FAB */}
+      <TouchableOpacity testID="home-coach-fab" onPress={() => router.push('/coach')} style={styles.fab} activeOpacity={0.85}>
+        <LinearGradient colors={['#7C3AED', '#5B21B6']} style={styles.fabInner} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <Ionicons name="sparkles" size={26} color="#fff" />
         </LinearGradient>
-        <View style={styles.fabPulse} />
+        <View style={styles.fabRing} />
       </TouchableOpacity>
     </ScreenBg>
   );
-}
-
-function iconForArea(a: string): any {
-  return ({
-    Career: 'briefcase',
-    Finances: 'cash',
-    Health: 'fitness',
-    Relationships: 'people',
-    Mind: 'bulb',
-    Skills: 'construct',
-  } as Record<string, string>)[a];
 }
 
 function StreakBadge({ streak, testID }: { streak: number; testID?: string }) {
@@ -310,8 +331,7 @@ function StreakBadge({ streak, testID }: { streak: number; testID?: string }) {
           withTiming(1.08, { duration: 700, easing: Easing.inOut(Easing.ease) }),
           withTiming(1, { duration: 700 }),
         ),
-        -1,
-        true,
+        -1, true,
       );
     }
   }, [streak]);
@@ -324,212 +344,134 @@ function StreakBadge({ streak, testID }: { streak: number; testID?: string }) {
   );
 }
 
-function MissionCard({
-  mission,
-  completed,
-  onPress,
-}: { mission: StoredMission; completed: boolean; onPress: () => void }) {
+function MissionCard({ mission, completed, kind, onPress }:
+  { mission: StoredMission; completed: boolean; kind: 'main' | 'side'; onPress: () => void }) {
+  const accent = areaColors[mission.area] || colors.primary;
   return (
-    <TouchableOpacity activeOpacity={0.9} onPress={onPress} testID="home-today-mission">
-      <GlassCard style={styles.missionCard}>
-        <LinearGradient
-          colors={[`${areaColors[mission.area] || colors.primary}33`, 'transparent']}
-          style={[StyleSheet.absoluteFillObject, { borderRadius: 24 }]}
-        />
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress} testID={kind === 'main' ? 'home-today-mission' : `home-side-${mission.id}`}>
+      <GlassCard tint={`${accent}11`} style={kind === 'side' ? { marginTop: 8, paddingVertical: 14 } : { paddingVertical: 16 }}>
         <View style={styles.missionTop}>
-          <View
-            style={[
-              styles.missionIcon,
-              { backgroundColor: `${areaColors[mission.area] || colors.primary}22` },
-            ]}
-          >
-            <Ionicons
-              name={mission.icon as any}
-              size={26}
-              color={areaColors[mission.area] || colors.primary}
-            />
+          <View style={[styles.missionIcon, { backgroundColor: `${accent}22` }]}>
+            <Ionicons name={mission.icon as any} size={kind === 'side' ? 20 : 26} color={accent} />
           </View>
-          <View style={styles.missionMeta}>
-            <Text style={styles.missionArea}>{mission.area.toUpperCase()}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="time-outline" size={12} color={colors.textDim} />
-              <Text style={styles.missionMinutes}>{mission.minutes} min</Text>
-            </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={styles.missionArea}>{mission.area.toUpperCase()} · {mission.minutes} MIN</Text>
+            <Text style={[styles.mainTitle, kind === 'side' && { fontSize: 16 }]}>{mission.title}</Text>
           </View>
-          {completed && (
-            <View style={styles.completedTag}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.green} />
+          {completed && <Ionicons name="checkmark-circle" size={24} color={colors.green} />}
+        </View>
+        {kind === 'main' && (
+          <>
+            <Text style={styles.mainDesc}>{mission.description}</Text>
+            <View style={styles.missionCta}>
+              <Text style={styles.missionCtaTxt}>
+                {completed ? 'Concluída hoje' : 'Iniciar missão'}
+              </Text>
+              <Ionicons
+                name={completed ? 'checkmark' : 'arrow-forward'}
+                size={18}
+                color={completed ? colors.green : colors.primaryLight}
+              />
             </View>
-          )}
-        </View>
-        <Text style={styles.missionTitle}>{mission.title}</Text>
-        <Text style={styles.missionDesc}>{mission.description}</Text>
-        <View style={styles.missionCta}>
-          <Text style={styles.missionCtaTxt}>
-            {completed ? 'Completed today' : 'Start mission'}
-          </Text>
-          <Ionicons
-            name={completed ? 'checkmark' : 'arrow-forward'}
-            size={18}
-            color={completed ? colors.green : colors.primary}
-          />
-        </View>
+          </>
+        )}
       </GlassCard>
     </TouchableOpacity>
   );
 }
 
-function BossPrompt({ state }: { state: State }) {
-  const router = useRouter();
-  const eligible = state.totalMissionsDone >= 5; // every 5 missions for demo, every 30 days in prod
-  if (!eligible) return null;
+function ChapterGate({ state, onOpen }: { state: State; onOpen: () => void }) {
   return (
-    <TouchableOpacity testID="home-boss-prompt" onPress={() => router.push('/boss')} activeOpacity={0.85}>
-      <GlassCard style={{ marginTop: 24 }}>
+    <TouchableOpacity activeOpacity={0.9} onPress={onOpen} style={{ marginTop: 20 }} testID="home-chapter-gate">
+      <LinearGradient colors={['#1A0B2A', '#7C3AED', '#EC4899']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.chapterGate}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Ionicons name="skull" size={28} color="#EF4444" />
-          <View style={{ flex: 1, marginLeft: 14 }}>
-            <Text style={styles.bossTitle}>Boss Battle Available</Text>
-            <Text style={styles.bossSub}>3-day intensive challenge. Rare badge on victory.</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          <Ionicons name="lock-closed" size={22} color="#fff" />
+          <Text style={styles.chapterGateTitle}>  O Capítulo 4 te espera</Text>
         </View>
-      </GlassCard>
+        <Text style={styles.chapterGateSub}>
+          Seu LifeScript está apenas começando. Abra o próximo capítulo.
+        </Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+}
+
+function QuickAction({ icon, label, onPress, testID, gradient }: any) {
+  return (
+    <TouchableOpacity onPress={onPress} testID={testID} style={{ flex: 1 }} activeOpacity={0.85}>
+      <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={styles.qa}>
+        <Ionicons name={icon} size={22} color="#fff" />
+        <Text style={styles.qaTxt}>{label}</Text>
+      </LinearGradient>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingTop: 64, paddingHorizontal: 18, paddingBottom: 40 },
-
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 22 },
+  scroll: { paddingTop: 62, paddingHorizontal: 18, paddingBottom: 40 },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   greeting: { color: colors.text, fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
-  subGreeting: { color: colors.textDim, fontSize: 13, marginTop: 4 },
+  subGreeting: { color: colors.textDim, fontSize: 12, marginTop: 4 },
   streakBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(245,158,11,0.15)',
-    borderColor: 'rgba(245,158,11,0.4)',
-    borderWidth: 1,
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 999,
-    gap: 6,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.4)', borderWidth: 1,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, gap: 6,
   },
   streakNum: { color: '#F59E0B', fontWeight: '800', fontSize: 16, marginLeft: 4 },
 
-  levelCard: { paddingVertical: 18 },
-  levelTop: { flexDirection: 'row', alignItems: 'center' },
-  levelIconBg: {
-    width: 52, height: 52,
-    alignItems: 'center', justifyContent: 'center',
-    borderRadius: 26, borderWidth: 1,
-  },
-  levelLabel: { color: colors.textDim, fontSize: 11, letterSpacing: 1.5, fontWeight: '700' },
-  levelName: { color: colors.text, fontSize: 22, fontWeight: '800', marginTop: 2, letterSpacing: -0.5 },
-  xpNumber: { color: colors.gold, fontSize: 16, fontWeight: '800' },
+  levelCircle: { width: 52, height: 52, borderRadius: 26, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  levelNum: { fontWeight: '800', fontSize: 22 },
+  eraName: { color: colors.textDim, fontSize: 11, letterSpacing: 1.5, fontWeight: '700' },
+  levelTitle: { color: colors.text, fontSize: 20, fontWeight: '800', marginTop: 2 },
+  xp: { color: colors.gold, fontWeight: '800', fontSize: 16 },
   xpNext: { color: colors.textDim, fontSize: 11, marginTop: 2 },
   xpBarBg: {
-    height: 8,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 4,
-    marginTop: 16,
-    overflow: 'hidden',
+    height: 6, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 3,
+    marginTop: 12, overflow: 'hidden',
   },
-  xpBarFill: { height: '100%', borderRadius: 4 },
-  levelTagline: {
-    color: colors.textAccent,
-    fontSize: 12,
-    fontStyle: 'italic',
-    marginTop: 10,
-  },
+  xpBarFill: { height: '100%', borderRadius: 3 },
+  tagline: { color: colors.textAccent, fontSize: 12, fontStyle: 'italic', marginTop: 8 },
 
-  missionCard: { paddingVertical: 18, position: 'relative' },
-  missionTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  missionIcon: {
-    width: 56, height: 56,
-    alignItems: 'center', justifyContent: 'center',
-    borderRadius: 18,
+  sharePill: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: colors.border,
   },
-  missionMeta: { flex: 1, marginLeft: 14 },
-  missionArea: {
-    color: colors.textDim, fontSize: 11, letterSpacing: 1.4, fontWeight: '700',
-  },
-  missionMinutes: {
-    color: colors.textDim, fontSize: 12, marginLeft: 4,
-  },
-  missionTitle: {
-    color: colors.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5, lineHeight: 28,
-  },
-  missionDesc: { color: colors.textDim, fontSize: 14, marginTop: 8, lineHeight: 20 },
-  missionCta: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: 18,
-    paddingTop: 14,
-    borderTopWidth: 1, borderTopColor: colors.border,
-  },
-  missionCtaTxt: { color: colors.text, fontWeight: '700', fontSize: 15 },
-  completedTag: {
-    backgroundColor: 'rgba(16,185,129,0.15)',
-    padding: 6, borderRadius: 999,
-  },
+  sharePillTxt: { color: colors.text, fontSize: 12, fontWeight: '600' },
+
+  linkTxt: { color: colors.primaryLight, fontSize: 12, fontWeight: '700' },
+
+  missionTop: { flexDirection: 'row', alignItems: 'center' },
+  missionIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  missionArea: { color: colors.textDim, fontSize: 11, letterSpacing: 1.3, fontWeight: '700', marginBottom: 2 },
+  mainTitle: { color: colors.text, fontSize: 18, fontWeight: '800', lineHeight: 24, letterSpacing: -0.3 },
+  mainDesc: { color: colors.textDim, fontSize: 14, lineHeight: 20, marginTop: 8 },
+  missionCta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
+  missionCtaTxt: { color: colors.text, fontWeight: '700', fontSize: 14 },
+
+  challengeIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  participants: { color: colors.gold, fontSize: 12, marginTop: 10, fontWeight: '700' },
 
   quote: { color: colors.text, fontSize: 14, lineHeight: 22, flex: 1, fontStyle: 'italic' },
 
-  wqTitle: { color: colors.text, fontWeight: '800', fontSize: 17 },
-  wqDesc: { color: colors.textDim, fontSize: 13, marginTop: 4, lineHeight: 18 },
-  wqDots: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 },
-  wqDot: {
-    width: 32, height: 32, borderRadius: 16,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  wqDotTxt: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
+  qa: { paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
+  qaTxt: { color: '#fff', fontWeight: '700', fontSize: 12, marginTop: 6 },
 
-  areasGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  areaItem: { width: '32%', alignItems: 'center', marginBottom: 16 },
-  areaLabel: { color: colors.text, fontSize: 12, marginTop: 6, fontWeight: '600' },
-  areaPct: { color: colors.textDim, fontSize: 11 },
+  chapterGate: { padding: 18, borderRadius: 20 },
+  chapterGateTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  chapterGateSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 6 },
 
-  scoreLabel: { color: colors.textDim, fontSize: 11, letterSpacing: 1.8, fontWeight: '700' },
-  scoreNumber: {
-    color: colors.text, fontSize: 64, fontWeight: '800', letterSpacing: -2,
-    marginTop: 4,
-  },
-  scoreSub: { color: colors.textDim, fontSize: 13, marginBottom: 6 },
-
-  proBanner: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 16, paddingHorizontal: 18, borderRadius: 20,
-  },
-  proTitle: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  proSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 },
+  proBanner: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 20 },
+  proTitle: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  proSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 },
 
   bossTitle: { color: '#fff', fontWeight: '800', fontSize: 16 },
   bossSub: { color: colors.textDim, fontSize: 12, marginTop: 3 },
 
-  fab: {
-    position: 'absolute',
-    right: 18, bottom: 100,
-    width: 60, height: 60, borderRadius: 30,
-  },
-  fabInner: {
-    width: 60, height: 60, borderRadius: 30,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOpacity: 0.7,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 12,
-  },
-  fabPulse: {
-    position: 'absolute', left: -4, top: -4, right: -4, bottom: -4,
-    borderRadius: 34,
-    borderWidth: 2,
-    borderColor: 'rgba(124,58,237,0.4)',
-  },
+  fab: { position: 'absolute', right: 18, bottom: 100, width: 62, height: 62, borderRadius: 31 },
+  fabInner: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center' },
+  fabRing: { position: 'absolute', left: -4, top: -4, right: -4, bottom: -4, borderRadius: 35, borderWidth: 2, borderColor: 'rgba(124,58,237,0.35)' },
+
   dim: { color: colors.textDim },
 });

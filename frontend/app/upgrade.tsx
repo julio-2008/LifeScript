@@ -20,12 +20,12 @@ import { loadState, saveState, State } from '../src/state';
 const { width } = Dimensions.get('window');
 
 const PROMISES = [
-  { with: 'Unlimited AI Coach',     without: '3 messages per day' },
-  { with: 'Unlimited daily missions', without: 'First 7 days only' },
-  { with: 'Boss Battles every 30 days', without: 'Locked' },
-  { with: 'Streak Shields',          without: 'No protection' },
-  { with: 'Advanced analytics',      without: 'Basic only' },
-  { with: 'Custom mission themes',   without: 'Default only' },
+  { with: 'Axiom IA ilimitado',     without: '3 mensagens por dia' },
+  { with: 'Missões diárias ilimitadas', without: 'Somente os 7 primeiros dias' },
+  { with: 'Boss Battles a cada 30 dias', without: 'Bloqueado' },
+  { with: 'Escudos de Sequência',   without: 'Sem proteção' },
+  { with: 'Analytics avançado',     without: 'Somente básico' },
+  { with: 'Temas de missão personalizados', without: 'Somente padrão' },
 ];
 
 export default function Upgrade() {
@@ -54,17 +54,17 @@ export default function Upgrade() {
   const purchase = async () => {
     if (!state) return;
     Alert.alert(
-      'Activate LifeScript Pro?',
-      'This is a demo — the upgrade flow is simulated.',
+      'Ativar LifeScript Pro?',
+      'Esta é uma demo — o fluxo de upgrade é simulado.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancelar', style: 'cancel' },
         {
-          text: plan === 'yearly' ? 'Activate yearly' : 'Activate monthly',
+          text: plan === 'yearly' ? 'Ativar anual' : 'Ativar mensal',
           onPress: async () => {
             const next = { ...state, pro: true };
             await saveState(next);
             setState(next);
-            Alert.alert('Welcome to Pro', 'All features unlocked. Enjoy!');
+            Alert.alert('Bem-vindo ao Pro', 'Todos os recursos desbloqueados. Aproveite!');
             router.back();
           },
         },
@@ -94,15 +94,15 @@ export default function Upgrade() {
             <Ionicons name="diamond" size={40} color="#fff" />
           </LinearGradient>
         </View>
-        <Text style={styles.title}>Unlock LifeScript Pro</Text>
-        <Text style={styles.subtitle}>Become the version of you that future-you wishes you started today.</Text>
+        <Text style={styles.title}>Desbloqueie o LifeScript Pro</Text>
+        <Text style={styles.subtitle}>Torne-se a versão de você que o seu eu futuro queria que tivesse começado hoje.</Text>
 
         {/* Countdown */}
         {!state.pro && (
           <View style={styles.countdown} testID="upgrade-countdown">
             <Ionicons name="timer" size={16} color={colors.gold} />
             <Text style={styles.countdownTxt}>
-              {`  Launch price ends in ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`}
+              {`  Preço de lançamento termina em ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`}
             </Text>
           </View>
         )}
@@ -110,7 +110,7 @@ export default function Upgrade() {
         {/* Before / After split */}
         <View style={styles.split}>
           <View style={[styles.splitCol, styles.beforeCol]}>
-            <Text style={[styles.splitHeader, { color: colors.textDim }]}>Without Pro</Text>
+            <Text style={[styles.splitHeader, { color: colors.textDim }]}>Sem Pro</Text>
             {PROMISES.map((p) => (
               <View key={p.without} style={styles.splitRow}>
                 <Ionicons name="lock-closed" size={14} color={colors.textDim} />
@@ -123,7 +123,7 @@ export default function Upgrade() {
               colors={['rgba(124,58,237,0.4)', 'rgba(236,72,153,0.25)']}
               style={StyleSheet.absoluteFill}
             />
-            <Text style={[styles.splitHeader, { color: '#fff' }]}>With Pro</Text>
+            <Text style={[styles.splitHeader, { color: '#fff' }]}>Com Pro</Text>
             {PROMISES.map((p) => (
               <View key={p.with} style={styles.splitRow}>
                 <Ionicons name="checkmark-circle" size={14} color={colors.gold} />
@@ -138,25 +138,25 @@ export default function Upgrade() {
           <PlanCard
             active={plan === 'monthly'}
             onPress={() => setPlan('monthly')}
-            title="Monthly"
-            price="$6.99"
-            cadence="/month"
+            title="Mensal"
+            price="R$ 34,90"
+            cadence="/mês"
             testID="plan-monthly"
           />
           <PlanCard
             active={plan === 'yearly'}
             onPress={() => setPlan('yearly')}
-            title="Yearly"
-            price="$49.99"
-            cadence="/year"
-            badge="SAVE 40%"
+            title="Anual"
+            price="R$ 249,90"
+            cadence="/ano"
+            badge="ECONOMIZE 40%"
             testID="plan-yearly"
           />
         </View>
 
         <View style={{ marginTop: 18 }}>
           <PrimaryButton
-            label={state.pro ? 'You are Pro 🎉' : `Activate ${plan === 'monthly' ? 'monthly' : 'yearly'}`}
+            label={state.pro ? 'Você é Pro 🎉' : `Ativar ${plan === 'monthly' ? 'mensal' : 'anual'}`}
             icon={state.pro ? 'trophy' : 'diamond'}
             testID="upgrade-purchase-btn"
             onPress={purchase}
@@ -166,7 +166,7 @@ export default function Upgrade() {
         </View>
 
         <Text style={styles.fineprint}>
-          Demo only — no real charge. Invite 3 friends to unlock 1 month free.
+          Apenas demo — sem cobrança real. Convide 3 amigos para desbloquear 1 mês grátis.
         </Text>
       </ScrollView>
     </ScreenBg>

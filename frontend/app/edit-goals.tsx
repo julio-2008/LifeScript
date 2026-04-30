@@ -1,69 +1,62 @@
-// Edit goals screen — lets the user update their answers and regenerate the plan.
+// Edit onboarding answers and regenerate plan — LifeScript 2.0.
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  ScrollView,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
+  View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity,
+  KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-
 import { ScreenBg, GlassCard, PrimaryButton } from '../src/ui';
 import { colors } from '../src/theme';
 import { loadState, saveState, State } from '../src/state';
 
+const FIELDS: { key: string; label: string; hint?: string; multiline?: boolean }[] = [
+  { key: 'dream', label: 'Biggest dream', multiline: true },
+  { key: 'obstacle', label: 'Biggest obstacle', multiline: true },
+  { key: 'one_year_vision', label: '1-year vision', multiline: true },
+  { key: 'proud_of_last_year', label: 'Proud of (last year)', multiline: true },
+  { key: 'someday_thing', label: '"Someday" thing', multiline: true },
+  { key: 'role_model', label: 'Role model', multiline: true },
+  { key: 'perfect_tuesday', label: 'Perfect Tuesday', multiline: true },
+  { key: 'one_change', label: 'One instant change', multiline: true },
+];
+
 export default function EditGoals() {
   const router = useRouter();
   const [state, setState] = useState<State | null>(null);
-  const [dream, setDream] = useState('');
-  const [obstacle, setObstacle] = useState('');
-  const [vision, setVision] = useState('');
-  const [hours, setHours] = useState(1);
-  const [focus, setFocus] = useState('');
+  const [values, setValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadState().then((s) => {
       setState(s);
       if (s.profile) {
-        setDream(s.profile.dream);
-        setObstacle(s.profile.obstacle);
-        setVision(s.profile.one_year_vision);
-        setHours(s.profile.hours_per_day);
-        setFocus(s.profile.focus_area);
+        setValues({
+          dream: s.profile.dream || '',
+          obstacle: s.profile.obstacle || '',
+          one_year_vision: s.profile.one_year_vision || '',
+          proud_of_last_year: s.profile.proud_of_last_year || '',
+          someday_thing: s.profile.someday_thing || '',
+          role_model: s.profile.role_model || '',
+          perfect_tuesday: s.profile.perfect_tuesday || '',
+          one_change: s.profile.one_change || '',
+        });
       }
     });
   }, []);
 
   if (!state || !state.profile) return <ScreenBg><View style={{ flex: 1 }} /></ScreenBg>;
 
-  const save = async () => {
-    const profile = {
-      ...state.profile!,
-      dream: dream.trim(),
-      obstacle: obstacle.trim(),
-      one_year_vision: vision.trim(),
-      hours_per_day: hours,
-      focus_area: focus,
-    };
-    const next = { ...state, profile };
-    await saveState(next);
-    Alert.alert('Saved', 'Want to regenerate your plan now?', [
-      { text: 'Later' },
-      {
-        text: 'Regenerate',
-        onPress: () => router.replace('/generating'),
-      },
-    ]);
-    setState(next);
-  };
+  const set = (k: string, v: string) => setValues((d) => ({ ...d, [k]: v }));
 
-  const focusList = ['Career', 'Finances', 'Health', 'Relationships', 'Mind', 'Skills'];
+  const save = async () => {
+    const profile = { ...state.profile!, ...values };
+    const next = { ...state, profile };
+    await saveState(next); setState(next);
+    Alert.alert('Saved', 'Regenerate your plan now?', [
+      { text: 'Later' },
+      { text: 'Regenerate', onPress: () => router.replace('/generating') },
+    ]);
+  };
 
   return (
     <ScreenBg>
@@ -76,72 +69,24 @@ export default function EditGoals() {
           <View style={{ width: 40 }} />
         </View>
 
-        <ScrollView
-          contentContainerStyle={{ padding: 24, paddingBottom: 50 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Field label="Biggest dream">
-            <TextInput
-              testID="edit-dream"
-              value={dream}
-              onChangeText={setDream}
-              style={styles.input}
-              multiline
-              placeholderTextColor={colors.textDim}
-            />
-          </Field>
-
-          <Field label="Biggest obstacle">
-            <TextInput
-              testID="edit-obstacle"
-              value={obstacle}
-              onChangeText={setObstacle}
-              style={styles.input}
-              multiline
-              placeholderTextColor={colors.textDim}
-            />
-          </Field>
-
-          <Field label="1-year vision">
-            <TextInput
-              testID="edit-vision"
-              value={vision}
-              onChangeText={setVision}
-              style={[styles.input, { minHeight: 110 }]}
-              multiline
-              placeholderTextColor={colors.textDim}
-            />
-          </Field>
-
-          <Field label={`Time per day · ${hours}h`}>
-            <View style={styles.sliderTrack}>
-              {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4].map((v) => (
-                <TouchableOpacity
-                  key={v}
-                  onPress={() => setHours(v)}
-                  style={[styles.dot, hours >= v && styles.dotActive]}
-                  testID={`edit-hours-${v}`}
+        <ScrollView contentContainerStyle={{ padding: 22 }} keyboardShouldPersistTaps="handled">
+          {FIELDS.map((f) => (
+            <View key={f.key} style={{ marginBottom: 18 }}>
+              <Text style={styles.label}>{f.label.toUpperCase()}</Text>
+              <GlassCard style={{ padding: 4 }}>
+                <TextInput
+                  testID={`edit-${f.key}`}
+                  value={values[f.key] || ''}
+                  onChangeText={(t) => set(f.key, t)}
+                  placeholderTextColor={colors.textDim}
+                  multiline={f.multiline}
+                  style={[styles.input, f.multiline && { minHeight: 80, textAlignVertical: 'top' }]}
                 />
-              ))}
+              </GlassCard>
             </View>
-          </Field>
+          ))}
 
-          <Field label="Focus area">
-            <View style={styles.chipsRow}>
-              {focusList.map((f) => (
-                <TouchableOpacity
-                  key={f}
-                  onPress={() => setFocus(f)}
-                  style={[styles.chip, focus === f && styles.chipActive]}
-                  testID={`edit-focus-${f}`}
-                >
-                  <Text style={[styles.chipTxt, focus === f && { color: colors.gold }]}>{f}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </Field>
-
-          <View style={{ marginTop: 18 }}>
+          <View style={{ marginTop: 12 }}>
             <PrimaryButton label="Save changes" icon="save" testID="edit-save-btn" onPress={save} variant="gold" />
           </View>
         </ScrollView>
@@ -150,39 +95,10 @@ export default function EditGoals() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={{ marginBottom: 18 }}>
-      <Text style={styles.label}>{label}</Text>
-      <GlassCard style={{ padding: 4 }}>{children}</GlassCard>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  headerRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: 60, paddingHorizontal: 16, paddingBottom: 8,
-  },
-  backBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  headerTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
-  label: { color: colors.textAccent, fontSize: 12, letterSpacing: 1.4, fontWeight: '700', marginBottom: 8 },
-  input: {
-    color: colors.text, padding: 14, fontSize: 15,
-    minHeight: 70, textAlignVertical: 'top',
-  },
-  sliderTrack: { flexDirection: 'row', padding: 14, gap: 4 },
-  dot: { flex: 1, height: 12, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.07)' },
-  dotActive: { backgroundColor: colors.primary },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 10 },
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 999, borderWidth: 1, borderColor: colors.border,
-  },
-  chipActive: { borderColor: colors.gold, backgroundColor: 'rgba(245,158,11,0.1)' },
-  chipTxt: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 60, paddingHorizontal: 16, paddingBottom: 6 },
+  backBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)' },
+  headerTitle: { color: colors.text, fontSize: 20, fontWeight: '800' },
+  label: { color: colors.textAccent, fontSize: 11, letterSpacing: 1.4, fontWeight: '700', marginBottom: 8 },
+  input: { color: colors.text, padding: 14, fontSize: 15 },
 });

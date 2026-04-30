@@ -56,7 +56,7 @@ export default function BossScreen() {
       setState(next);
       setBattle(b);
     } catch (e: any) {
-      Alert.alert('Could not generate boss', e?.message ?? 'Try again');
+      Alert.alert('Não foi possível gerar o boss', e?.message ?? 'Tente novamente');
     } finally {
       setLoading(false);
     }
@@ -86,7 +86,7 @@ export default function BossScreen() {
     setState(next);
     setBattle(updatedBattle);
     if (newProgress.every((x) => x)) {
-      Alert.alert('Boss defeated!', `You unlocked: ${battle.reward_badge}`);
+      Alert.alert('Boss derrotado!', `Você desbloqueou: ${battle.reward_badge}`);
       setTimeout(() => router.back(), 800);
     }
   };
@@ -107,13 +107,13 @@ export default function BossScreen() {
             <View style={{ marginBottom: 24 }}>
               <PulsingOrb size={160} />
             </View>
-            <Text style={styles.title}>A 3-day intensive awaits.</Text>
+            <Text style={styles.title}>Um intensivo de 3 dias te aguarda.</Text>
             <Text style={styles.subtitle}>
-              Defeat the boss to claim a rare badge and a permanent boost to all life areas.
+              Derrote o boss para conquistar uma medalha rara e um impulso permanente em todas as áreas da vida.
             </Text>
             <View style={{ marginTop: 24, alignSelf: 'stretch' }}>
               <PrimaryButton
-                label={loading ? 'Summoning…' : 'Summon the boss'}
+                label={loading ? 'Invocando…' : 'Invocar o boss'}
                 icon="skull"
                 testID="boss-start-btn"
                 onPress={startBattle}
@@ -132,7 +132,7 @@ export default function BossScreen() {
               <Ionicons name="skull" size={40} color="#fff" />
               <Text style={styles.battleTitle}>{battle.title}</Text>
               <Text style={styles.battleNarr}>{battle.narrative}</Text>
-              <Text style={styles.reward}>Reward: {battle.reward_badge}</Text>
+              <Text style={styles.reward}>Recompensa: {battle.reward_badge}</Text>
             </LinearGradient>
 
             {battle.days.map((d, i) => {
@@ -150,7 +150,7 @@ export default function BossScreen() {
                   {!done && (
                     <View style={{ marginTop: 12 }}>
                       <PrimaryButton
-                        label="Complete day"
+                        label="Concluir dia"
                         icon="checkmark"
                         testID={`boss-complete-${i}`}
                         onPress={() => completeDay(i)}

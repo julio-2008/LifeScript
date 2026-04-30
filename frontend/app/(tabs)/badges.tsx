@@ -31,17 +31,17 @@ export default function Badges() {
   return (
     <ScreenBg>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Your collection</Text>
+        <Text style={styles.title}>Sua coleção</Text>
         <Text style={styles.sub}>
           <Text style={{ color: colors.gold, fontWeight: '800' }} testID="badges-count">{earned}</Text>
-          <Text> of {total} badges earned</Text>
+          <Text> de {total} medalhas conquistadas</Text>
         </Text>
 
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${(earned / total) * 100}%` }]} />
         </View>
 
-        <SectionTitle style={{ marginTop: 28 }}>All badges</SectionTitle>
+        <SectionTitle style={{ marginTop: 28 }}>Todas as medalhas</SectionTitle>
 
         <View style={styles.grid}>
           {BADGES.map((b) => {

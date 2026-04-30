@@ -1,4 +1,4 @@
-// API client for LifeScript backend.
+// LifeScript 2.0 API client.
 import { Profile } from './state';
 
 const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || '';
@@ -14,16 +14,11 @@ export type AIMission = {
 
 export type InitialPlan = {
   missions: AIMission[];
-  weekly_quest: {
-    id: string;
-    title: string;
-    description: string;
-    daily_steps: string[];
-  };
+  weekly_quest: { id: string; title: string; description: string; daily_steps: string[] };
   welcome_quote: string;
 };
 
-async function post<T>(path: string, body: unknown, timeoutMs = 35000): Promise<T> {
+async function post<T>(path: string, body: unknown, timeoutMs = 40000): Promise<T> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -33,54 +28,53 @@ async function post<T>(path: string, body: unknown, timeoutMs = 35000): Promise<
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`API ${res.status}: ${txt}`);
-    }
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
     return (await res.json()) as T;
-  } finally {
-    clearTimeout(t);
-  }
+  } finally { clearTimeout(t); }
 }
 
-export function generateInitialPlan(profile: Profile): Promise<InitialPlan> {
-  return post<InitialPlan>('/ai/initial-plan', {
-    profile,
-    day_index: 0,
-    completed_missions: [],
-  });
-}
-
-export function generateDailyQuote(profile: Profile, streak: number): Promise<{ quote: string; author: string }> {
-  return post<{ quote: string; author: string }>('/ai/daily-quote', { profile, streak });
-}
-
-export function coachChat(payload: {
-  profile: Profile;
-  level: string;
-  streak: number;
-  total_xp: number;
-  today_mission?: string;
-  history: { role: 'user' | 'assistant'; content: string }[];
-  message: string;
-  session_id?: string | null;
-}): Promise<{ reply: string; session_id: string }> {
-  return post<{ reply: string; session_id: string }>('/ai/coach-chat', payload);
-}
-
-export function generateBossBattle(profile: Profile, cycle: number): Promise<{
-  title: string;
-  narrative: string;
-  days: { day: number; title: string; description: string; minutes: number }[];
-  reward_badge: string;
-}> {
-  return post('/ai/boss-battle', { profile, cycle });
-}
-
-export function regenerateMission(profile: Profile, previous: string, reason: string): Promise<AIMission> {
-  return post<AIMission>('/ai/regenerate-mission', {
-    profile,
-    previous_mission: previous,
-    reason,
-  });
-}
+export const api = {
+  initialPlan: (profile: Profile) =>
+    post<InitialPlan>('/ai/initial-plan', { profile, day_index: 0, completed_missions: [] }),
+  dailyQuote: (profile: Profile, streak: number) =>
+    post<{ quote: string; author: string }>('/ai/daily-quote', { profile, streak }),
+  coachChat: (payload: {
+    profile: Profile;
+    level: string;
+    streak: number;
+    total_xp: number;
+    today_mission?: string;
+    history: { role: 'user' | 'assistant'; content: string }[];
+    message: string;
+    session_id?: string | null;
+    mode: 'hard' | 'support' | 'strategist' | 'philosopher' | 'silent';
+    recent_reflections?: string[];
+    recent_missions?: string[];
+  }) => post<{ reply: string; session_id: string }>('/ai/coach-chat', payload),
+  bossBattle: (profile: Profile, cycle: number) =>
+    post<{ title: string; narrative: string; days: { day: number; title: string; description: string; minutes: number }[]; reward_badge: string }>(
+      '/ai/boss-battle', { profile, cycle },
+    ),
+  sideQuests: (profile: Profile, neglected_areas: string[]) =>
+    post<{ missions: AIMission[] }>('/ai/side-quests', { profile, neglected_areas }),
+  stealthMission: (profile: Profile, current_level: string) =>
+    post<AIMission>('/ai/stealth-mission', { profile, current_level }),
+  dailyChallenge: (day: string) =>
+    post<{ title: string; description: string; icon: string; participants: number }>('/ai/daily-challenge', { day }),
+  hiddenPattern: (profile: Profile) =>
+    post<{ title: string; insight: string }>('/ai/hidden-pattern', { profile }),
+  identityCard: (payload: {
+    profile: Profile; level: string; streak: number;
+    total_missions: number; top_areas: string[]; recent_reflections?: string[];
+  }) => post<{ statement: string; percent_progress: number }>('/ai/identity-card', payload),
+  weeklyInsight: (payload: {
+    profile: Profile; area_scores: Record<string, number>; streak: number;
+    missions_last_7_days: number; neglected_areas: string[];
+  }) => post<{ diagnosis: string; challenge: string; quote: string }>('/ai/weekly-insight', payload),
+  reflectionQuestion: (profile: Profile, mission_title: string, area: string) =>
+    post<{ question: string }>('/ai/reflection-question', { profile, mission_title, area }),
+  regenerateMission: (profile: Profile, previous_mission: string, reason: string) =>
+    post<AIMission>('/ai/regenerate-mission', { profile, previous_mission, reason }),
+  chapterMessage: (profile: Profile, chapter: number) =>
+    post<{ headline: string; body: string; cliffhanger: string }>('/ai/chapter-message', { profile, chapter }),
+};

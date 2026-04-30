@@ -1,43 +1,64 @@
-// LifeScript badge catalog. Locked badges are grayed in the UI.
+// LifeScript 2.0 badges + trait catalog.
 export type Badge = {
   id: string;
   name: string;
   description: string;
-  icon: string; // ionicons or material-community-icons name
-  iconSet?: 'ion' | 'mci';
+  icon: string;
   color: string;
-  rule: string; // human-readable trigger
+  rule: string;
+  rarity?: 'common' | 'rare' | 'legendary';
 };
 
 export const BADGES: Badge[] = [
-  { id: 'first_step',     name: 'First Step',     description: 'Completed your very first mission.', icon: 'footsteps',     color: '#10B981', rule: 'Day 1 mission complete' },
-  { id: 'early_bird',     name: 'Early Bird',     description: 'Started a mission before 9am.',      icon: 'sunny-outline', color: '#F59E0B', rule: 'Mission before 9am' },
-  { id: 'unstoppable',    name: 'Unstoppable',    description: '7-day streak achieved.',             icon: 'flame',         color: '#EF4444', rule: '7-day streak' },
-  { id: 'transformer',    name: 'Transformer',    description: '30-day streak achieved.',            icon: 'infinite',      color: '#8B5CF6', rule: '30-day streak' },
-  { id: 'mind_master',    name: 'Mind Master',    description: 'Completed 10 Mind missions.',        icon: 'bulb',          color: '#7C3AED', rule: '10 Mind missions' },
-  { id: 'wealth_builder', name: 'Wealth Builder', description: 'Completed 10 Finance missions.',     icon: 'cash',          color: '#F59E0B', rule: '10 Finance missions' },
-  { id: 'iron_body',      name: 'Iron Body',      description: 'Completed 10 Health missions.',      icon: 'barbell',       color: '#10B981', rule: '10 Health missions' },
-  { id: 'social_arc',     name: 'Connector',      description: 'Completed 10 Relationship missions.',icon: 'people',        color: '#EC4899', rule: '10 Relationship missions' },
-  { id: 'craftsman',      name: 'Craftsman',      description: 'Completed 10 Skills missions.',      icon: 'hammer',        color: '#06B6D4', rule: '10 Skills missions' },
-  { id: 'climber',        name: 'Climber',        description: 'Completed 10 Career missions.',      icon: 'trending-up',   color: '#3B82F6', rule: '10 Career missions' },
-  { id: 'level_2',        name: 'Seeker',         description: 'Reached Level 2.',                   icon: 'compass',       color: '#3B82F6', rule: 'Reach Level 2' },
-  { id: 'level_3',        name: 'Builder',        description: 'Reached Level 3.',                   icon: 'construct',     color: '#7C3AED', rule: 'Reach Level 3' },
-  { id: 'level_4',        name: 'Achiever',       description: 'Reached Level 4.',                   icon: 'trophy',        color: '#F59E0B', rule: 'Reach Level 4' },
-  { id: 'level_5',        name: 'Legend',         description: 'Reached Level 5.',                   icon: 'flame',         color: '#EC4899', rule: 'Reach Level 5' },
-  { id: 'level_6',        name: 'Sovereign',      description: 'Reached the highest level.',         icon: 'planet',        color: '#FFD700', rule: 'Reach Level 6' },
-  { id: 'boss_slayer',    name: 'Boss Slayer',    description: 'Defeated your first Boss Battle.',   icon: 'skull',         color: '#7C3AED', rule: 'First Boss Battle complete' },
-  { id: 'shielded',       name: 'Shielded',       description: 'Earned a Streak Shield.',            icon: 'shield-checkmark', color: '#10B981', rule: 'Earn a streak shield' },
-  { id: 'sharer',         name: 'Evangelist',     description: 'Shared your first LifeScript.',      icon: 'share-social',  color: '#7C3AED', rule: 'First share' },
-  { id: 'recruiter',      name: 'Recruiter',      description: 'Invited your first friend.',         icon: 'person-add',    color: '#06B6D4', rule: 'First referral' },
-  { id: 'tribe',          name: 'Tribe Builder',  description: 'Invited 3 friends — Pro unlocked.',  icon: 'people-circle', color: '#F59E0B', rule: '3 referrals' },
-  { id: 'rest_master',    name: 'Rest Master',    description: 'Took a wise rest day.',              icon: 'bed',           color: '#9CA3AF', rule: 'Take a rest day' },
-  { id: 'comeback',       name: 'Comeback Kid',   description: 'Restarted after losing a streak.',   icon: 'refresh-circle',color: '#3B82F6', rule: 'Restart after streak loss' },
-  { id: 'century',        name: 'Centurion',      description: 'Completed 100 missions total.',      icon: 'medal',         color: '#FFD700', rule: '100 missions complete' },
-  { id: 'night_owl',      name: 'Night Owl',      description: 'Completed a mission after 10pm.',    icon: 'moon',          color: '#1F2937', rule: 'Mission after 10pm' },
-  { id: 'first_quote',    name: 'Wordsmith',      description: 'Read your first daily quote.',       icon: 'sparkles',      color: '#EC4899', rule: 'Read first quote' },
+  // Core milestones
+  { id: 'first_step', name: 'First Step', description: 'Wrote the first line of your LifeScript.', icon: 'footsteps', color: '#10B981', rule: 'Day 1 mission complete' },
+  { id: 'unstoppable', name: 'Unstoppable', description: '7-day streak.', icon: 'flame', color: '#F43F5E', rule: '7-day streak' },
+  { id: 'transformer', name: 'Transformer', description: '30-day streak.', icon: 'infinite', color: '#A78BFA', rule: '30-day streak' },
+  { id: 'centurion', name: 'Centurion', description: '100 missions completed.', icon: 'medal', color: '#FFD700', rule: '100 missions', rarity: 'rare' },
+  { id: 'early_bird', name: 'Early Bird', description: 'Mission before 9am.', icon: 'sunny', color: '#F59E0B', rule: 'Mission before 9am' },
+  { id: 'night_owl', name: 'Night Owl', description: 'Mission after 10pm.', icon: 'moon', color: '#1F2937', rule: 'Mission after 10pm' },
+
+  // Chapter badges
+  { id: 'chapter_1', name: 'Chapter I', description: 'Completed Chapter 1.', icon: 'book', color: '#A78BFA', rule: 'Finish Day 1' },
+  { id: 'chapter_2', name: 'Chapter II', description: 'Completed Chapter 2.', icon: 'book', color: '#3B82F6', rule: 'Finish Day 2' },
+  { id: 'chapter_3', name: 'Chapter III', description: 'Uncovered the hidden pattern.', icon: 'eye', color: '#F59E0B', rule: 'Finish Day 3', rarity: 'rare' },
+
+  // Era badges
+  { id: 'era_1', name: 'Awakened', description: 'Entered the Awakening era.', icon: 'partly-sunny', color: '#A78BFA', rule: 'Reach Level 1+' },
+  { id: 'era_2', name: 'Builder', description: 'Entered the Builder era.', icon: 'hammer', color: '#3B82F6', rule: 'Reach Level 11' },
+  { id: 'era_3', name: 'Achiever', description: 'Entered the Achiever era.', icon: 'trophy', color: '#10B981', rule: 'Reach Level 21' },
+  { id: 'era_4', name: 'Leader', description: 'Entered the Leader era.', icon: 'flame', color: '#F43F5E', rule: 'Reach Level 31' },
+  { id: 'era_5', name: 'Sovereign', description: 'Entered the Sovereign era.', icon: 'planet', color: '#FFFFFF', rule: 'Reach Level 41', rarity: 'legendary' },
+  { id: 'prestige', name: 'Prestige', description: 'Completed your first LifeScript.', icon: 'star', color: '#FFD700', rule: 'Reach Level 50', rarity: 'legendary' },
+
+  // Area traits (10 missions in an area)
+  { id: 'trait_career', name: 'Career Strategist', description: '10 Career missions.', icon: 'briefcase', color: '#3B82F6', rule: '10 Career' },
+  { id: 'trait_finances', name: 'Financial Strategist', description: '10 Finance missions.', icon: 'cash', color: '#F59E0B', rule: '10 Finance' },
+  { id: 'trait_health', name: 'Iron Body', description: '10 Health missions.', icon: 'barbell', color: '#10B981', rule: '10 Health' },
+  { id: 'trait_relationships', name: 'Connector', description: '10 Relationship missions.', icon: 'people', color: '#F43F5E', rule: '10 Relationships' },
+  { id: 'trait_mind', name: 'Focused Mind', description: '10 Mind missions.', icon: 'bulb', color: '#A78BFA', rule: '10 Mind' },
+  { id: 'trait_skills', name: 'Craftsman', description: '10 Skill missions.', icon: 'construct', color: '#06B6D4', rule: '10 Skills' },
+  { id: 'trait_purpose', name: 'Navigator', description: '10 Purpose missions.', icon: 'compass', color: '#FFFFFF', rule: '10 Purpose' },
+  { id: 'trait_legacy', name: 'Legacy Weaver', description: '10 Legacy missions.', icon: 'ribbon', color: '#FFD700', rule: '10 Legacy' },
+
+  // Social / virality
+  { id: 'sharer', name: 'Evangelist', description: 'First share.', icon: 'share-social', color: '#A78BFA', rule: 'First share' },
+  { id: 'recruiter', name: 'Recruiter', description: 'First referral.', icon: 'person-add', color: '#06B6D4', rule: 'First referral' },
+  { id: 'tribe', name: 'Tribe Builder', description: '3 friends joined.', icon: 'people-circle', color: '#F59E0B', rule: '3 referrals' },
+  { id: 'champion', name: 'Champion', description: 'Won a Life Score battle.', icon: 'ribbon', color: '#FFD700', rule: 'Win a battle', rarity: 'rare' },
+  { id: 'defeated', name: 'Defeated', description: 'Lost a Life Score battle. Come back stronger.', icon: 'skull', color: '#6B7280', rule: 'Lose a battle' },
+  { id: 'letter_sealed', name: 'Time Traveller', description: 'Sealed your legacy letter.', icon: 'mail', color: '#A78BFA', rule: 'Seal future letter' },
+  { id: 'dream_built', name: 'Dream Keeper', description: 'Placed 5 stars on your dream board.', icon: 'star', color: '#F59E0B', rule: '5 dream stars' },
+
+  // Special
+  { id: 'hidden_pattern', name: 'Pattern Seen', description: 'Uncovered your hidden pattern.', icon: 'eye', color: '#F59E0B', rule: 'Day 3 insight', rarity: 'rare' },
+  { id: 'boss_slayer', name: 'Boss Slayer', description: 'Defeated a Boss Battle.', icon: 'skull', color: '#A78BFA', rule: 'Complete boss', rarity: 'rare' },
+  { id: 'shielded', name: 'Shielded', description: 'Earned a Streak Shield.', icon: 'shield-checkmark', color: '#10B981', rule: 'Earn shield' },
+  { id: 'first_spin', name: 'Lucky', description: 'Spun the wheel.', icon: 'flash', color: '#F59E0B', rule: 'First daily spin' },
+  { id: 'reflector', name: 'Reflector', description: 'Wrote 10 mission reflections.', icon: 'create', color: '#C4B5FD', rule: '10 reflections' },
+  { id: 'identity_seen', name: 'Identified', description: 'Unlocked your Identity Card.', icon: 'card', color: '#F59E0B', rule: 'Generate identity card', rarity: 'rare' },
 ];
 
-export function awardBadge(unlocked: string[], id: string): string[] {
-  if (unlocked.includes(id)) return unlocked;
-  return [...unlocked, id];
+export function awardBadge(list: string[], id: string): string[] {
+  return list.includes(id) ? list : [...list, id];
 }

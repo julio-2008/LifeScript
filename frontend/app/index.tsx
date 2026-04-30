@@ -92,19 +92,19 @@ export default function Splash() {
           </Animated.Text>
 
           <Animated.Text style={[styles.tagline, taglineStyle]} testID="splash-tagline">
-            Your life. Scripted by you.{'\n'}Powered by AI.
+            Sua vida. Escrita por você.{'\n'}Impulsionada por IA.
           </Animated.Text>
 
           <Animated.View style={[styles.buttonWrap, buttonStyle]}>
             <PrimaryButton
-              label="Begin your journey"
+              label="Comece sua jornada"
               icon="arrow-forward"
               testID="splash-start-btn"
               onPress={() => router.push('/onboarding')}
             />
             <View style={styles.subRow}>
               <Ionicons name="shield-checkmark" size={14} color={colors.textDim} />
-              <Text style={styles.subTxt}>Private. Personal. Powered by Claude.</Text>
+              <Text style={styles.subTxt}>Privado. Pessoal. Impulsionado por Claude.</Text>
             </View>
           </Animated.View>
         </ScrollView>

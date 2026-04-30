@@ -49,7 +49,7 @@ export default function LevelUp() {
       <ConfettiBurst visible={show} />
       <View style={styles.root}>
         <Text style={styles.kicker}>LEVEL UP</Text>
-        <Text style={styles.title}>You are now</Text>
+        <Text style={styles.title}>Você agora é</Text>
 
         <Animated.View style={[styles.iconCircle, { borderColor: levelObj.color, backgroundColor: `${levelObj.color}22` }, a]}>
           <Ionicons name={levelObj.icon as any} size={70} color={levelObj.color} />
@@ -60,7 +60,7 @@ export default function LevelUp() {
 
         <View style={{ marginTop: 36, width: '100%' }}>
           <PrimaryButton
-            label="Share my milestone"
+            label="Compartilhar marco"
             icon="share-social"
             testID="levelup-share-btn"
             onPress={() => router.replace('/share')}
@@ -68,7 +68,7 @@ export default function LevelUp() {
           />
           <View style={{ height: 10 }} />
           <PrimaryButton
-            label="Back to my map"
+            label="Voltar ao meu mapa"
             icon="planet"
             testID="levelup-continue-btn"
             onPress={() => router.replace('/(tabs)')}
