@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "NeuroSync",
+    "slug": "neurosync",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "neurosync",
+    "backgroundColor": "#080810",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.neurosync.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#080810"
+      },
+      "package": "com.neurosync.app",
+      "softwareKeyboardLayoutMode": "pan"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
