@@ -1,5 +1,15 @@
 // LifeScript 2.0 — full persistent state.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  EconomyState,
+  FutureSelfCard,
+  CounterfactualRetrospective,
+  ReturnState,
+  BioStatusSnapshot,
+  ClimateContext,
+  GeofenceEvent,
+  LedgerEntry,
+} from './models';
 
 export type Profile = {
   name: string;
@@ -148,6 +158,16 @@ export type State = {
   theme: 'aurora' | 'nebula' | 'ember' | 'forest' | 'mono';
   bossCycle: number;
   lastBossDate: string | null;
+  ledgerVersion: number;
+  ledgerLastSync: string | null;
+  ledgerEntries: LedgerEntry[];
+  economy: EconomyState;
+  futureSelfCard: FutureSelfCard | null;
+  counterfactualRetrospectives: CounterfactualRetrospective[];
+  returnState: ReturnState;
+  bioStatus: BioStatusSnapshot;
+  climateContext: ClimateContext | null;
+  geofenceContext: GeofenceEvent | null;
 };
 
 export const LIFE_AREAS = ['Career', 'Finances', 'Health', 'Relationships', 'Mind', 'Skills', 'Purpose', 'Legacy'] as const;
@@ -213,6 +233,42 @@ export const INITIAL_STATE: State = {
   lastStealthDate: null,
   lastEmergencyDate: null,
   dailyChallengeDate: null,
+  ledgerVersion: 1,
+  ledgerLastSync: null,
+  ledgerEntries: [],
+  economy: {
+    current: { time: 180, attention: 100, willpower: 75 },
+    maximum: { time: 180, attention: 100, willpower: 75 },
+    regeneration: { timePerHour: 40, attentionPerHour: 18, willpowerPerHour: 12 },
+    friction: { time: 8, attention: 5, willpower: 3 },
+    lastUpdatedAt: new Date().toISOString(),
+    debt: { time: 0, attention: 0, willpower: 0 },
+    burnoutRisk: 0,
+  },
+  futureSelfCard: null,
+  counterfactualRetrospectives: [],
+  returnState: {
+    lastActiveAt: new Date().toISOString(),
+    absenceDays: 0,
+    trigger: 'none',
+    recoveryMode: 'light',
+    reconfiguration: {
+      dailyMissions: 3,
+      preferredWindow: '08:00-12:00',
+      allowRituals: true,
+    },
+    lastReturnMessage: 'Bem-vindo ao LifeScript. Esta é a sua linha do retorno.',
+  },
+  bioStatus: {
+    heartRate: 68,
+    sleepScore: 80,
+    cognitiveDebt: 0,
+    stressRatio: 0.1,
+    hydrated: true,
+    recordedAt: new Date().toISOString(),
+  },
+  climateContext: null,
+  geofenceContext: null,
   darkMode: true,
   reminderTime: '08:00',
   notificationsEnabled: true,

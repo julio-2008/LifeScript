@@ -13,6 +13,7 @@ import Animated, {
 
 import {
   ScreenBg, GlassCard, SectionTitle, PrimaryButton, ConstellationMap, TypingText,
+  StreakChain,
 } from '../../src/ui';
 import { colors, areaColors, areaIcons, LIFE_AREAS as THEME_AREAS } from '../../src/theme';
 import {
@@ -96,6 +97,21 @@ export default function Home() {
   const nxt = nextLevel(state.xp);
   const lvlProgress = progressToNext(state.xp);
   const score = lifeScore(state);
+
+  // Streak chain data — derive completed days from mission archive.
+  const completedDates = (() => {
+    const set = new Set<string>();
+    for (const m of state.missionArchive) {
+      if (!m.completed) continue;
+      const iso = m.completedAt || m.date;
+      if (!iso) continue;
+      set.add(iso.slice(0, 10));
+    }
+    for (const m of state.missions) {
+      if (m.completed && m.date) set.add(m.date.slice(0, 10));
+    }
+    return set;
+  })();
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -222,6 +238,48 @@ export default function Home() {
             ))}
           </>
         )}
+
+        {/* Future Self Watching — AI reflection card */}
+        <TouchableOpacity
+          testID="home-future-self-btn"
+          onPress={() => router.push('/future-self')}
+          activeOpacity={0.88}
+          style={{ marginTop: 20 }}
+        >
+          <LinearGradient
+            colors={['#1E0B4A', '#4C1D95', '#0B0820']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={styles.futureCard}
+          >
+            <View style={styles.futureGlow} pointerEvents="none" />
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={styles.futureIcon}>
+                <Ionicons name="eye" size={22} color={colors.gold} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.futureTitle}>Seu Futuro Eu Está Observando</Text>
+                <Text style={styles.futureSub}>
+                  Veja a diferença entre continuar igual e executar as próximas missões.
+                </Text>
+              </View>
+            </View>
+            <View style={styles.futureCta}>
+              <Text style={styles.futureCtaTxt}>Ver meu futuro</Text>
+              <Ionicons name="arrow-forward" size={16} color="#fff" />
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Streak chain — "Corrente de Execução" */}
+        <SectionTitle style={{ marginTop: 20 }}>Corrente de Execução</SectionTitle>
+        <GlassCard testID="home-streak-chain" tint="rgba(245,158,11,0.05)">
+          <StreakChain
+            days={14}
+            completedDates={completedDates}
+            todayKey={today}
+            streak={state.streak}
+          />
+        </GlassCard>
 
         {/* Daily Challenge */}
         {challenge && (
@@ -472,6 +530,29 @@ const styles = StyleSheet.create({
   fab: { position: 'absolute', right: 18, bottom: 100, width: 62, height: 62, borderRadius: 31 },
   fabInner: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center' },
   fabRing: { position: 'absolute', left: -4, top: -4, right: -4, bottom: -4, borderRadius: 35, borderWidth: 2, borderColor: 'rgba(124,58,237,0.35)' },
+
+  futureCard: {
+    borderRadius: 22, padding: 18, borderWidth: 1,
+    borderColor: 'rgba(167,139,250,0.4)', overflow: 'hidden',
+  },
+  futureGlow: {
+    position: 'absolute', top: -40, right: -40, width: 180, height: 180,
+    borderRadius: 90, backgroundColor: 'rgba(245,158,11,0.1)',
+  },
+  futureIcon: {
+    width: 46, height: 46, borderRadius: 14,
+    backgroundColor: 'rgba(245,158,11,0.14)',
+    borderWidth: 1, borderColor: 'rgba(245,158,11,0.32)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  futureTitle: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
+  futureSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 4, lineHeight: 17 },
+  futureCta: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end',
+    marginTop: 14, paddingTop: 10, borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.12)', gap: 6,
+  },
+  futureCtaTxt: { color: '#fff', fontWeight: '800', fontSize: 13 },
 
   dim: { color: colors.textDim },
 });

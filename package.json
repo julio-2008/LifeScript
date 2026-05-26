@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@expo/config-plugins": "^55.0.9",
+    "expo-router": "^55.0.15"
+  }
+}

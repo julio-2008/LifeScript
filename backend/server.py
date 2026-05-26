@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import List, Literal, Optional
 
 from dotenv import load_dotenv
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+import requests
+from requests.exceptions import RequestException
 from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from starlette.middleware.cors import CORSMiddleware
@@ -19,6 +20,7 @@ load_dotenv(ROOT_DIR / ".env")
 
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
+ANTHROPIC_API_URL = "https://api.anthropic.com/v1/chat/completions"
 
 app = FastAPI(title="LifeScript 2.0 API")
 api_router = APIRouter(prefix="/api")
@@ -200,6 +202,19 @@ class WeeklyInsightResponse(BaseModel):
     quote: str
 
 
+class MonthlyLetterRequest(BaseModel):
+    profile: UserProfile
+    area_scores: dict
+    streak: int
+    missions_last_30_days: int
+    boss_history: List[str] = Field(default_factory=list)
+    recent_reflections: List[str] = Field(default_factory=list)
+
+
+class MonthlyLetterResponse(BaseModel):
+    letter_body: str
+
+
 class ReflectionQRequest(BaseModel):
     profile: UserProfile
     mission_title: str
@@ -227,6 +242,36 @@ class ChapterMessageResponse(BaseModel):
     cliffhanger: str
 
 
+class FutureSelfRequest(BaseModel):
+    profile: UserProfile
+    level: str
+    streak: int
+    total_missions_done: int
+    missions_skipped: int
+    life_score: int
+    strongest_area: str = ""
+    weakest_area: str = ""
+    identity_statement: str = ""
+    recent_reflections: List[str] = Field(default_factory=list)
+    recent_missions: List[str] = Field(default_factory=list)
+
+
+class FutureSelfAction(BaseModel):
+    title: str
+    duration: str
+    impact: str
+    area: str
+    icon: str
+    minutes: int = 15
+
+
+class FutureSelfResponse(BaseModel):
+    current_route: str
+    alternative_route: str
+    actions: List[FutureSelfAction]
+    future_self_message: str
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -241,35 +286,55 @@ def _strip_json(raw: str) -> str:
     return cleaned
 
 
-def _new_chat(system_message: str, session_id: Optional[str] = None) -> LlmChat:
+def _call_anthropic(messages: list[dict]) -> str:
     if not EMERGENT_LLM_KEY:
         raise HTTPException(
             status_code=500,
             detail="EMERGENT_LLM_KEY is not configured on the server.",
         )
-    return LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=session_id or str(uuid.uuid4()),
-        system_message=system_message,
-    ).with_model("anthropic", CLAUDE_MODEL)
+    payload = {
+        "model": CLAUDE_MODEL,
+        "messages": messages,
+        "temperature": 0.35,
+        "max_tokens_to_sample": 1200,
+    }
+    headers = {
+        "Authorization": f"Bearer {EMERGENT_LLM_KEY}",
+        "Content-Type": "application/json",
+    }
+    try:
+        response = requests.post(ANTHROPIC_API_URL, headers=headers, json=payload, timeout=60)
+        response.raise_for_status()
+        body = response.json()
+        return body["choices"][0]["message"]["content"]
+    except (RequestException, KeyError, ValueError) as exc:
+        logger.error("Anthropic request failed: %s", exc)
+        raise HTTPException(status_code=502, detail=f"AI request failed: {exc}")
 
 
 async def _ask_for_json(system_message: str, user_text: str) -> dict:
     """JSON request with one retry on transient errors."""
     last_err: Optional[Exception] = None
+    messages = [
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": user_text},
+    ]
     for _ in range(2):
-        chat = _new_chat(system_message)
         try:
-            response = await chat.send_message(UserMessage(text=user_text))
-        except Exception as exc:  # noqa: BLE001
+            response = _call_anthropic(messages)
+            return json.loads(_strip_json(response))
+        except Exception as exc:
             last_err = exc
             continue
-        try:
-            return json.loads(_strip_json(response))
-        except json.JSONDecodeError as exc:
-            last_err = exc
-            logger.error("Claude returned invalid JSON: %s", response)
     raise HTTPException(status_code=502, detail=f"AI request failed: {last_err}")
+
+
+def _compose_history(history: List[CoachMessage]) -> list[dict]:
+    return [
+        {"role": m.role, "content": m.content}
+        for m in history
+        if m.role in {"user", "assistant"}
+    ]
 
 
 def _profile_summary(p: UserProfile) -> str:
@@ -399,11 +464,12 @@ Regras:
 - Faça referência a itens passados específicos quando relevante — você lembra.
 - Nunca diga que você é uma IA.
 - Texto puro — sem JSON, sem markdown, sem bullets (exceto no modo Estrategista)."""
-    chat = _new_chat(system, session_id=session_id)
-    for m in req.history[-12:]:
-        if m.role == "user":
-            await chat.send_message(UserMessage(text=m.content))
-    reply = await chat.send_message(UserMessage(text=req.message))
+    messages = [
+        {"role": "system", "content": system},
+        *(_compose_history(req.history[-12:])),
+        {"role": "user", "content": req.message},
+    ]
+    reply = _call_anthropic(messages)
     return CoachChatResponse(reply=reply.strip(), session_id=session_id)
 
 
@@ -553,6 +619,32 @@ Return:
     )
 
 
+@api_router.post("/ai/monthly-letter", response_model=MonthlyLetterResponse)
+async def monthly_letter(req: MonthlyLetterRequest):
+    system = (
+        "Você escreve a Carta Mensal do LifeScript em português do Brasil. "
+        "O tom deve ser ritualístico, refletindo o que foi vivido nos últimos 30 dias, "
+        "celebrando progresso e propondo uma pergunta central para o próximo mês. "
+        "A carta deve ser emocional, não técnica. Apenas JSON."
+    )
+    reflections = "\n".join(f"- {r}" for r in req.recent_reflections[-5:]) or "(sem reflexões recentes)"
+    areas = ", ".join(f"{k}: {v:.0%}" for k, v in req.area_scores.items())
+    user_msg = f"""Perfil:
+{_profile_summary(req.profile)}
+
+Pontuações de área: {areas}
+Sequência: {req.streak} dias
+Missões nos últimos 30 dias: {req.missions_last_30_days}
+Bosses enfrentados: {', '.join(req.boss_history) or 'nenhum'}
+Reflexões recentes:
+{reflections}
+
+Return:
+{{"letter_body":"..."}}"""
+    data = await _ask_for_json(system, user_msg)
+    return MonthlyLetterResponse(letter_body=data.get("letter_body", ""))
+
+
 @api_router.post("/ai/reflection-question", response_model=ReflectionQResponse)
 async def reflection_question(req: ReflectionQRequest):
     system = "Você escreve UMA pergunta curta de reflexão após alguém completar uma missão. Em português do Brasil. Apenas JSON."
@@ -598,6 +690,72 @@ Return:
     return ChapterMessageResponse(
         headline=data["headline"], body=data["body"], cliffhanger=data["cliffhanger"],
     )
+
+
+@api_router.post("/ai/future-self", response_model=FutureSelfResponse)
+async def future_self(req: FutureSelfRequest):
+    system = (
+        "Você é o Axioma, a IA do LifeScript. Sua tarefa é escrever uma reflexão chamada "
+        "'Seu Futuro Eu Está Observando'. Com base nos dados do usuário, você pinta DUAS "
+        "rotas possíveis — a rota atual (se ele continuar com os mesmos padrões) e a rota "
+        "alternativa (se ele executar as próximas missões com consistência). Também gera "
+        "3 ações personalizadas, curtas, realistas e ligadas ao sonho, obstáculo e área "
+        "mais fraca do usuário. Por fim, escreve UMA mensagem curta, emocional, direta — "
+        "como se a versão futura do usuário estivesse falando com a versão atual. Nunca "
+        "genérico, nunca pregador, nunca motivacional barato. Nunca mencione 'finanças', "
+        "'academia' ou 'negócios' de forma genérica — use SOMENTE o que está no perfil. "
+        "Responda em português do Brasil. APENAS JSON válido."
+    )
+    reflections = "\n".join(f"- {r}" for r in req.recent_reflections[-5:]) or "(sem reflexões ainda)"
+    missions = "\n".join(f"- {m}" for m in req.recent_missions[-6:]) or "(sem missões recentes)"
+    identity = req.identity_statement or "(ainda sem cartão de identidade)"
+    user_msg = f"""PERFIL DO USUÁRIO:
+{_profile_summary(req.profile)}
+
+ESTADO ATUAL:
+Nível: {req.level}
+Life Score: {req.life_score}/1000
+Sequência atual: {req.streak} dias
+Missões concluídas: {req.total_missions_done}
+Missões puladas/abandonadas: {req.missions_skipped}
+Área mais forte: {req.strongest_area or "(ainda indefinida)"}
+Área mais fraca: {req.weakest_area or "(ainda indefinida)"}
+Identidade em construção: {identity}
+
+Reflexões recentes do usuário:
+{reflections}
+
+Missões recentes:
+{missions}
+
+Gere o JSON estrito:
+{{
+  "current_route": "2-3 frases descrevendo a rota atual se o usuário continuar como está. Tom de alerta sutil, NUNCA assustador. Cite especificamente o maior sonho OU o maior obstáculo dele. Evite clichês. Use segunda pessoa.",
+  "alternative_route": "2-3 frases descrevendo a rota que nasce se ele executar com consistência as próximas missões. Tom aspiracional, roxo/dourado. Cite sua visão de 1 ano OU seu sonho. Concreto, não fluffy.",
+  "actions": [
+    {{"title":"Título curto ≤6 palavras","duration":"ex: 10 min","impact":"Impacto esperado em 1 frase curta","area":"Career|Finances|Health|Relationships|Mind|Skills|Purpose|Legacy","icon":"rocket-outline","minutes":10}},
+    {{"title":"...","duration":"...","impact":"...","area":"...","icon":"bulb-outline","minutes":15}},
+    {{"title":"...","duration":"...","impact":"...","area":"...","icon":"flame-outline","minutes":15}}
+  ],
+  "future_self_message": "1-2 frases curtas, emocionais, diretas. A VERSÃO FUTURA do usuário falando com a versão atual. Nunca começar com 'Eu sei que...'. Nunca clichê. Deve parecer que cobra, não que consola."
+}}
+
+Regras:
+- As 3 ações devem priorizar a área mais fraca e o maior obstáculo do usuário.
+- Varie os ícones: use de {ICON_LIST}.
+- NUNCA fale de finanças/academia/negócios a menos que o perfil fale.
+- APENAS JSON."""
+    data = await _ask_for_json(system, user_msg)
+    try:
+        actions = [FutureSelfAction(**a) for a in data.get("actions", [])[:3]]
+        return FutureSelfResponse(
+            current_route=data["current_route"],
+            alternative_route=data["alternative_route"],
+            actions=actions,
+            future_self_message=data["future_self_message"],
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail=f"AI shape error: {exc}")
 
 
 # ---------------------------------------------------------------------------

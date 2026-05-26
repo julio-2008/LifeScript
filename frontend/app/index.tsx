@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { ScreenBg, PrimaryButton, PulsingOrb } from '../src/ui';
+import { LogoWithText } from '../src/components/LogoBrand';
 import { colors } from '../src/theme';
 import { loadState } from '../src/state';
 
@@ -84,7 +85,7 @@ export default function Splash() {
           bounces={false}
         >
           <Animated.View style={[styles.logoWrap, logoStyle]}>
-            <PulsingOrb size={orbSize} />
+            <LogoWithText size={80} variant="light" showText={false} />
           </Animated.View>
 
           <Animated.Text style={[styles.title, titleStyle]} testID="splash-title">

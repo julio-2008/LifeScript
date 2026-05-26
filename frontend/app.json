@@ -46,7 +46,12 @@
       ],
       "expo-web-browser",
       "expo-notifications",
-      "expo-audio"
+      "expo-audio",
+      "expo-sqlite",
+      "expo-font",
+      "expo-image",
+      "expo-localization",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true

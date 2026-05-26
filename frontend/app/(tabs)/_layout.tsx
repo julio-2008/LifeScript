@@ -2,14 +2,22 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView } from 'react-native';
 import { colors } from '../../src/theme';
+import { LogoMinimal } from '../../src/components/LogoBrand';
 
 export default function TabsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
+    <>
+      <SafeAreaView style={{ backgroundColor: '#0A0A1A', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 10 }}>
+          <LogoMinimal size={24} variant="light" />
+          <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, letterSpacing: 0.5 }}>LifeScript</Text>
+        </View>
+      </SafeAreaView>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
         tabBarShowLabel: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textDim,
@@ -58,10 +66,10 @@ export default function TabsLayout() {
           ),
         }}
       />
-    </Tabs>
+      </Tabs>
+    </>
   );
 }
-
 function TabIcon({ name, color, testID }: { name: any; color: string; testID: string }) {
   return (
     <View testID={testID} style={{ alignItems: 'center', justifyContent: 'center' }}>

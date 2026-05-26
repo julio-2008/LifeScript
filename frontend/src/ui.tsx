@@ -337,3 +337,127 @@ export function TypingText({
 export function GradientBg({ colors: c }: { colors: readonly [string, string, ...string[]] }) {
   return <LinearGradient colors={c} style={StyleSheet.absoluteFill} />;
 }
+
+// ------------------------- StreakChain -------------------------
+// "Corrente de Execução" — last N days, each day is a bead connected by a
+// subtle line. Completed days glow purple/gold, today pulses, missed days are
+// dim. Derived from any day the user closed a mission.
+export function StreakChain({
+  days = 14, completedDates, todayKey: today, streak,
+}: {
+  days?: number;
+  completedDates: Set<string>;
+  todayKey: string;
+  streak: number;
+}) {
+  // Build array of last N days (oldest → today).
+  const items = React.useMemo(() => {
+    const out: { key: string; done: boolean; isToday: boolean; label: string }[] = [];
+    const base = new Date(today + 'T00:00:00');
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(base);
+      d.setDate(base.getDate() - i);
+      const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const weekday = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'][d.getDay()];
+      out.push({ key: k, done: completedDates.has(k), isToday: k === today, label: weekday });
+    }
+    return out;
+  }, [days, completedDates, today]);
+
+  const pulse = useSharedValue(1);
+  React.useEffect(() => {
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1.15, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 1000 }),
+      ),
+      -1, true,
+    );
+  }, []);
+
+  return (
+    <View>
+      <View style={chainS.row}>
+        {items.map((d, idx) => {
+          const prevDone = idx > 0 ? items[idx - 1].done : false;
+          return (
+            <View key={d.key} style={chainS.cell}>
+              {idx > 0 && (
+                <View
+                  style={[
+                    chainS.link,
+                    { backgroundColor: prevDone && d.done ? '#A78BFA' : 'rgba(255,255,255,0.08)' },
+                  ]}
+                />
+              )}
+              <StreakBead item={d} pulse={pulse} />
+            </View>
+          );
+        })}
+      </View>
+      <View style={chainS.labels}>
+        {items.map((d, i) => (
+          <Text
+            key={`lbl-${d.key}`}
+            style={[
+              chainS.lbl,
+              d.isToday && { color: colors.gold, fontWeight: '800' },
+            ]}
+          >
+            {d.label}
+          </Text>
+        ))}
+      </View>
+      <View style={chainS.footer}>
+        <Ionicons name="flame" size={14} color={colors.gold} />
+        <Text style={chainS.streakTxt}> Sequência atual: {streak} {streak === 1 ? 'dia' : 'dias'}</Text>
+        <Text style={chainS.streakHint}>  ·  Não quebre a corrente.</Text>
+      </View>
+    </View>
+  );
+}
+
+function StreakBead({
+  item, pulse,
+}: {
+  item: { key: string; done: boolean; isToday: boolean; label: string };
+  pulse: any;
+}) {
+  const aStyle = useAnimatedStyle(() =>
+    item.isToday ? { transform: [{ scale: pulse.value }] } : { transform: [{ scale: 1 }] },
+  );
+  const base = item.done
+    ? { backgroundColor: 'rgba(167,139,250,0.9)', borderColor: '#F59E0B' }
+    : { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.14)' };
+  return (
+    <Animated.View
+      style={[
+        chainS.bead,
+        base,
+        item.isToday && { borderColor: colors.gold, borderWidth: 2 },
+        aStyle,
+      ]}
+    >
+      {item.done && <Ionicons name="checkmark" size={12} color="#fff" />}
+      {!item.done && item.isToday && (
+        <View style={chainS.todayDot} />
+      )}
+    </Animated.View>
+  );
+}
+
+const chainS = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cell: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  link: { flex: 1, height: 2, marginHorizontal: 2 },
+  bead: {
+    width: 22, height: 22, borderRadius: 11, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  todayDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.gold },
+  labels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingHorizontal: 2 },
+  lbl: { flex: 1, textAlign: 'center', color: colors.textDim, fontSize: 10, fontWeight: '600' },
+  footer: { flexDirection: 'row', alignItems: 'center', marginTop: 14, flexWrap: 'wrap' },
+  streakTxt: { color: colors.text, fontSize: 12, fontWeight: '700' },
+  streakHint: { color: colors.textDim, fontSize: 12 },
+});

@@ -77,4 +77,22 @@ export const api = {
     post<AIMission>('/ai/regenerate-mission', { profile, previous_mission, reason }),
   chapterMessage: (profile: Profile, chapter: number) =>
     post<{ headline: string; body: string; cliffhanger: string }>('/ai/chapter-message', { profile, chapter }),
+  futureSelf: (payload: {
+    profile: Profile;
+    level: string;
+    streak: number;
+    total_missions_done: number;
+    missions_skipped: number;
+    life_score: number;
+    strongest_area?: string;
+    weakest_area?: string;
+    identity_statement?: string;
+    recent_reflections?: string[];
+    recent_missions?: string[];
+  }) => post<{
+    current_route: string;
+    alternative_route: string;
+    actions: { title: string; duration: string; impact: string; area: string; icon: string; minutes: number }[];
+    future_self_message: string;
+  }>('/ai/future-self', payload, 60000),
 };
