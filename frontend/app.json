@@ -49,9 +49,7 @@
       "expo-audio",
       "expo-sqlite",
       "expo-font",
-      "expo-image",
-      "expo-localization",
-      "expo-sharing"
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true
