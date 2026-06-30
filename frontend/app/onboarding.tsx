@@ -1,42 +1,113 @@
-// 15-question onboarding for LifeScript 2.0. Each question feels like a conversation,
-// not a form.
-import React, { useState, useEffect, useRef } from 'react';
+// Onboarding LifeScript — 15 perguntas em conversa, com seletor de idioma fixo
+// no canto superior direito. Padrão: Português (BR).
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   KeyboardAvoidingView, Platform, ScrollView, Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withTiming, withSpring, withRepeat, Easing,
+  useSharedValue, useAnimatedStyle, withTiming, withSpring, Easing,
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 
-import { ScreenBg, PrimaryButton, PulsingOrb } from '../src/ui';
+import { ScreenBg, PrimaryButton } from '../src/ui';
 import { colors, areaColors } from '../src/theme';
 import { Profile, loadState, saveState } from '../src/state';
 
 const { width } = Dimensions.get('window');
 const TOTAL = 15;
 
-const QUESTIONS = [
-  { id: 'name',      title: 'What should I call you?',          hint: 'I\'ll use your name often.',        mood: 'dawn' },
-  { id: 'age',       title: 'How old are you?',                 hint: 'Context shapes missions.',          mood: 'dawn' },
-  { id: 'country',   title: 'Where do you live?',               hint: 'City or country — your pick.',      mood: 'dawn' },
-  { id: 'dream',     title: 'What is your biggest dream?',      hint: 'Be honest. The braver, the better.',mood: 'sky' },
-  { id: 'obstacle',  title: 'What stands in your way?',         hint: 'Naming it shrinks it.',              mood: 'heavy' },
-  { id: 'hours',     title: 'Daily time for yourself?',         hint: 'Even 30 minutes compounds.',         mood: 'focus' },
-  { id: 'focus',     title: 'Where do you want growth first?',  hint: 'Pick your constellation anchor.',    mood: 'focus' },
-  { id: 'income',    title: 'Your current income level?',       hint: 'No judgement. It shapes missions.',  mood: 'focus' },
-  { id: 'style',     title: 'Fast wins or deep work?',          hint: 'Your rhythm matters.',               mood: 'focus' },
-  { id: 'vision',    title: 'Describe your life in 1 year.',    hint: 'If everything went right.',          mood: 'sky' },
-  { id: 'proud',     title: 'One thing you are proud of?',      hint: 'From the last 12 months.',           mood: 'warm' },
-  { id: 'someday',   title: 'What do you keep saying "someday" about?', hint: 'That thing you keep postponing.', mood: 'heavy' },
-  { id: 'rolemodel', title: 'Whose life do you want yours to resemble — and why?', hint: 'No rush. Name them.', mood: 'sky' },
-  { id: 'tuesday',   title: 'What does a perfect Tuesday look like?', hint: 'Tuesdays because they\'re ordinary.', mood: 'warm' },
-  { id: 'change',    title: 'If you could change one thing about yourself instantly — what?', hint: 'The honest answer.', mood: 'heavy' },
-] as const;
+type Lang = 'pt' | 'en';
+
+// Estrutura: cada pergunta em PT e EN. PT é o padrão.
+const QUESTIONS: Array<{
+  id: string;
+  mood: 'dawn' | 'sky' | 'heavy' | 'focus' | 'warm';
+  pt: { title: string; hint: string; placeholder?: string };
+  en: { title: string; hint: string; placeholder?: string };
+}> = [
+  { id: 'name', mood: 'dawn',
+    pt: { title: 'Como devo te chamar?', hint: 'Vou usar seu nome com frequência.', placeholder: 'Seu nome' },
+    en: { title: 'What should I call you?', hint: "I'll use your name often.", placeholder: 'Your name' } },
+  { id: 'age', mood: 'dawn',
+    pt: { title: 'Quantos anos você tem?', hint: 'O contexto molda as missões.', placeholder: 'Idade' },
+    en: { title: 'How old are you?', hint: 'Context shapes missions.', placeholder: 'Age' } },
+  { id: 'country', mood: 'dawn',
+    pt: { title: 'Onde você mora?', hint: 'Cidade ou país — você escolhe.', placeholder: 'País / cidade' },
+    en: { title: 'Where do you live?', hint: 'City or country — your pick.', placeholder: 'Country / city' } },
+  { id: 'dream', mood: 'sky',
+    pt: { title: 'Qual é o seu maior sonho?', hint: 'Seja honesto. Quanto mais corajoso, melhor.', placeholder: 'Construir uma empresa. Viajar o mundo. Curar-se…' },
+    en: { title: 'What is your biggest dream?', hint: 'Be honest. The braver, the better.', placeholder: 'Build a company. Heal. Travel the world…' } },
+  { id: 'obstacle', mood: 'heavy',
+    pt: { title: 'O que está no seu caminho?', hint: 'Nomear o obstáculo o encolhe.', placeholder: 'Procrastinação, medo, dinheiro…' },
+    en: { title: 'What stands in your way?', hint: 'Naming it shrinks it.', placeholder: 'Procrastination, fear, money…' } },
+  { id: 'hours', mood: 'focus',
+    pt: { title: 'Quanto tempo por dia para você?', hint: 'Mesmo 30 minutos acumulam.' },
+    en: { title: 'Daily time for yourself?', hint: 'Even 30 minutes compounds.' } },
+  { id: 'focus', mood: 'focus',
+    pt: { title: 'Onde você quer crescer primeiro?', hint: 'Escolha sua âncora na constelação.' },
+    en: { title: 'Where do you want growth first?', hint: 'Pick your constellation anchor.' } },
+  { id: 'income', mood: 'focus',
+    pt: { title: 'Qual é sua renda atual?', hint: 'Sem julgamento. Isso molda as missões.' },
+    en: { title: 'Your current income level?', hint: 'No judgement. It shapes missions.' } },
+  { id: 'style', mood: 'focus',
+    pt: { title: 'Vitórias rápidas ou trabalho profundo?', hint: 'Seu ritmo importa.' },
+    en: { title: 'Fast wins or deep work?', hint: 'Your rhythm matters.' } },
+  { id: 'vision', mood: 'sky',
+    pt: { title: 'Descreva sua vida daqui a 1 ano.', hint: 'Se tudo desse certo.', placeholder: 'Acordo em paz. Construí…' },
+    en: { title: 'Describe your life in 1 year.', hint: 'If everything went right.', placeholder: 'I wake up calm. I have built…' } },
+  { id: 'proud', mood: 'warm',
+    pt: { title: 'Algo que te orgulha?', hint: 'Dos últimos 12 meses.', placeholder: 'Comecei a correr. Disse não. Mudei…' },
+    en: { title: 'One thing you are proud of?', hint: 'From the last 12 months.', placeholder: 'I moved. I started running. I said no.' } },
+  { id: 'someday', mood: 'heavy',
+    pt: { title: 'O que você sempre adia dizendo "um dia"?', hint: 'Aquela coisa que você sempre posterga.', placeholder: 'Aquela coisa que você fica dizendo "um dia"' },
+    en: { title: 'What do you keep saying "someday" about?', hint: 'That thing you keep postponing.', placeholder: 'That thing you keep saying "someday" about' } },
+  { id: 'rolemodel', mood: 'sky',
+    pt: { title: 'Qual vida você gostaria que se parecesse com a sua — e por quê?', hint: 'Sem pressa. Nomeie a pessoa.', placeholder: 'Alguém cuja vida parece certa — e por quê' },
+    en: { title: 'Whose life do you want yours to resemble — and why?', hint: 'No rush. Name them.', placeholder: 'Someone whose life feels right — and why' } },
+  { id: 'tuesday', mood: 'warm',
+    pt: { title: 'Como seria uma terça-feira perfeita?', hint: 'Terças porque são dias comuns.', placeholder: 'Café devagar. Trabalho profundo. Caminhada às 17h…' },
+    en: { title: 'What does a perfect Tuesday look like?', hint: "Tuesdays because they're ordinary.", placeholder: 'Slow coffee. Deep work. A walk at 5pm…' } },
+  { id: 'change', mood: 'heavy',
+    pt: { title: 'Se pudesse mudar uma coisa em si na hora — qual seria?', hint: 'A resposta honesta.', placeholder: 'Se a mudança instantânea fosse possível…' },
+    en: { title: 'If you could change one thing about yourself instantly — what?', hint: 'The honest answer.', placeholder: 'If instant change were possible…' } },
+];
+
+// UI labels traduzidas
+const UI = {
+  pt: {
+    cta_continue: 'Continuar',
+    cta_generate: 'Gerar meu LifeScript',
+    focus_areas: {
+      Career: 'Carreira', Finances: 'Finanças', Health: 'Saúde',
+      Relationships: 'Relações', Mind: 'Mente', Skills: 'Habilidades',
+    } as Record<string, string>,
+    income_options: { Low: 'Baixa', Medium: 'Média', High: 'Alta' } as Record<string, string>,
+    style_options: {
+      'Fast wins': { label: 'Vitórias rápidas', desc: 'Momento rápido. Pequenas vitórias diárias.' },
+      'Deep work': { label: 'Trabalho profundo', desc: 'Mais lento. Mais transformador.' },
+    } as Record<string, { label: string; desc: string }>,
+    hours_min: '30 min',
+    hours_max: '4 horas',
+  },
+  en: {
+    cta_continue: 'Continue',
+    cta_generate: 'Generate my LifeScript',
+    focus_areas: {
+      Career: 'Career', Finances: 'Finances', Health: 'Health',
+      Relationships: 'Relationships', Mind: 'Mind', Skills: 'Skills',
+    } as Record<string, string>,
+    income_options: { Low: 'Low', Medium: 'Medium', High: 'High' } as Record<string, string>,
+    style_options: {
+      'Fast wins': { label: 'Fast wins', desc: 'Quick momentum. Daily small victories.' },
+      'Deep work': { label: 'Deep work', desc: 'Slower. More transformative.' },
+    } as Record<string, { label: string; desc: string }>,
+    hours_min: '30 min',
+    hours_max: '4 hours',
+  },
+};
 
 const focusAreas = [
   { key: 'Career', icon: 'briefcase' },
@@ -49,6 +120,7 @@ const focusAreas = [
 
 export default function Onboarding() {
   const router = useRouter();
+  const [lang, setLang] = useState<Lang>('pt');
   const [step, setStep] = useState(0);
   const [data, setData] = useState<Record<string, any>>({
     name: '', age: '', country: '', dream: '', obstacle: '',
@@ -69,8 +141,11 @@ export default function Onboarding() {
 
   const set = (k: string, v: any) => setData((d) => ({ ...d, [k]: v }));
 
+  const q = QUESTIONS[step];
+  const t = q[lang];
+  const ui = UI[lang];
+
   const canNext = (() => {
-    const q = QUESTIONS[step];
     const v = data[q.id];
     switch (q.id) {
       case 'age': return v && Number(v) > 0 && Number(v) < 120;
@@ -111,7 +186,7 @@ export default function Onboarding() {
   const progress = (step + 1) / TOTAL;
 
   return (
-    <ScreenBg gradient={moodToGradient(QUESTIONS[step].mood)}>
+    <ScreenBg gradient={moodToGradient(q.mood)}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={back} testID="onboarding-back-btn" style={styles.backBtn}>
@@ -119,21 +194,22 @@ export default function Onboarding() {
           </TouchableOpacity>
           <ProgressOrb value={progress} />
           <Text style={styles.stepTxt} testID="onboarding-step-indicator">{step + 1}/{TOTAL}</Text>
+          <LanguagePill lang={lang} onChange={setLang} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Animated.View style={[styles.questionWrap, a]}>
-            <Text style={styles.hint}>{QUESTIONS[step].hint}</Text>
-            <Text style={styles.q}>{QUESTIONS[step].title}</Text>
+            <Text style={styles.hint}>{t.hint}</Text>
+            <Text style={styles.q}>{t.title}</Text>
 
             <View style={{ marginTop: 28 }}>
-              {step === 0 && <TextInputField value={data.name} onChange={(t) => set('name', t)} placeholder="Your name" testID="onboarding-name-input" autoFocus />}
-              {step === 1 && <TextInputField value={data.age} onChange={(t) => set('age', t.replace(/[^0-9]/g, ''))} placeholder="Age" keyboardType="number-pad" maxLength={3} testID="onboarding-age-input" autoFocus />}
-              {step === 2 && <TextInputField value={data.country} onChange={(t) => set('country', t)} placeholder="Country" testID="onboarding-country-input" autoFocus />}
-              {step === 3 && <TextInputField multiline value={data.dream} onChange={(t) => set('dream', t)} placeholder="Build a company. Heal. Travel the world…" testID="onboarding-dream-input" autoFocus />}
-              {step === 4 && <TextInputField multiline value={data.obstacle} onChange={(t) => set('obstacle', t)} placeholder="Procrastination, fear, money…" testID="onboarding-obstacle-input" autoFocus />}
+              {step === 0 && <TextInputField value={data.name} onChange={(t: string) => set('name', t)} placeholder={QUESTIONS[0][lang].placeholder} testID="onboarding-name-input" autoFocus />}
+              {step === 1 && <TextInputField value={data.age} onChange={(t: string) => set('age', t.replace(/[^0-9]/g, ''))} placeholder={QUESTIONS[1][lang].placeholder} keyboardType="number-pad" maxLength={3} testID="onboarding-age-input" autoFocus />}
+              {step === 2 && <TextInputField value={data.country} onChange={(t: string) => set('country', t)} placeholder={QUESTIONS[2][lang].placeholder} testID="onboarding-country-input" autoFocus />}
+              {step === 3 && <TextInputField multiline value={data.dream} onChange={(t: string) => set('dream', t)} placeholder={QUESTIONS[3][lang].placeholder} testID="onboarding-dream-input" autoFocus />}
+              {step === 4 && <TextInputField multiline value={data.obstacle} onChange={(t: string) => set('obstacle', t)} placeholder={QUESTIONS[4][lang].placeholder} testID="onboarding-obstacle-input" autoFocus />}
               {step === 5 && (
-                <HoursSlider value={data.hours} onChange={(v) => set('hours', v)} />
+                <HoursSlider value={data.hours} onChange={(v) => set('hours', v)} ui={ui} />
               )}
               {step === 6 && (
                 <View style={styles.cards}>
@@ -144,36 +220,38 @@ export default function Onboarding() {
                         testID={`onboarding-focus-${f.key}`}
                         style={[styles.card, active && { borderColor: areaColors[f.key] }]}>
                         <Ionicons name={f.icon as any} size={28} color={active ? areaColors[f.key] : colors.text} />
-                        <Text style={[styles.cardLabel, active && { color: areaColors[f.key] }]}>{f.key}</Text>
+                        <Text style={[styles.cardLabel, active && { color: areaColors[f.key] }]}>
+                          {ui.focus_areas[f.key]}
+                        </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
               )}
               {step === 7 && (['Low', 'Medium', 'High'] as const).map((opt) => (
-                <Row key={opt} label={opt} active={data.income === opt} onPress={() => set('income', opt)} testID={`onboarding-income-${opt}`} />
+                <Row key={opt} label={ui.income_options[opt]} active={data.income === opt} onPress={() => set('income', opt)} testID={`onboarding-income-${opt}`} />
               ))}
               {step === 8 && ([
-                { key: 'Fast wins', desc: 'Quick momentum. Daily small victories.', icon: 'flash' },
-                { key: 'Deep work', desc: 'Slower. More transformative.', icon: 'planet' },
+                { key: 'Fast wins', icon: 'flash' },
+                { key: 'Deep work', icon: 'planet' },
               ] as const).map((opt) => (
-                <Row key={opt.key} label={opt.key} desc={opt.desc} icon={opt.icon}
+                <Row key={opt.key} label={ui.style_options[opt.key].label} desc={ui.style_options[opt.key].desc} icon={opt.icon}
                   active={data.style === opt.key} onPress={() => set('style', opt.key)}
                   testID={`onboarding-style-${opt.key}`} />
               ))}
-              {step === 9 && <TextInputField multiline minHeight={140} value={data.vision} onChange={(t) => set('vision', t)} placeholder="I wake up calm. I have built…" testID="onboarding-vision-input" autoFocus />}
-              {step === 10 && <TextInputField multiline value={data.proud} onChange={(t) => set('proud', t)} placeholder="I moved. I started running. I said no." testID="onboarding-proud-input" autoFocus />}
-              {step === 11 && <TextInputField multiline value={data.someday} onChange={(t) => set('someday', t)} placeholder="That thing you keep saying 'someday' about" testID="onboarding-someday-input" autoFocus />}
-              {step === 12 && <TextInputField multiline value={data.rolemodel} onChange={(t) => set('rolemodel', t)} placeholder="Someone whose life feels right — and why" testID="onboarding-rolemodel-input" autoFocus />}
-              {step === 13 && <TextInputField multiline value={data.tuesday} onChange={(t) => set('tuesday', t)} placeholder="Slow coffee. Deep work. A walk at 5pm…" testID="onboarding-tuesday-input" autoFocus />}
-              {step === 14 && <TextInputField multiline value={data.change} onChange={(t) => set('change', t)} placeholder="If instant change were possible…" testID="onboarding-change-input" autoFocus />}
+              {step === 9 && <TextInputField multiline minHeight={140} value={data.vision} onChange={(t: string) => set('vision', t)} placeholder={QUESTIONS[9][lang].placeholder} testID="onboarding-vision-input" autoFocus />}
+              {step === 10 && <TextInputField multiline value={data.proud} onChange={(t: string) => set('proud', t)} placeholder={QUESTIONS[10][lang].placeholder} testID="onboarding-proud-input" autoFocus />}
+              {step === 11 && <TextInputField multiline value={data.someday} onChange={(t: string) => set('someday', t)} placeholder={QUESTIONS[11][lang].placeholder} testID="onboarding-someday-input" autoFocus />}
+              {step === 12 && <TextInputField multiline value={data.rolemodel} onChange={(t: string) => set('rolemodel', t)} placeholder={QUESTIONS[12][lang].placeholder} testID="onboarding-rolemodel-input" autoFocus />}
+              {step === 13 && <TextInputField multiline value={data.tuesday} onChange={(t: string) => set('tuesday', t)} placeholder={QUESTIONS[13][lang].placeholder} testID="onboarding-tuesday-input" autoFocus />}
+              {step === 14 && <TextInputField multiline value={data.change} onChange={(t: string) => set('change', t)} placeholder={QUESTIONS[14][lang].placeholder} testID="onboarding-change-input" autoFocus />}
             </View>
           </Animated.View>
         </ScrollView>
 
         <View style={styles.footer}>
           <PrimaryButton
-            label={step === TOTAL - 1 ? 'Generate my LifeScript' : 'Continue'}
+            label={step === TOTAL - 1 ? ui.cta_generate : ui.cta_continue}
             icon={step === TOTAL - 1 ? 'sparkles' : 'arrow-forward'}
             testID="onboarding-next-btn"
             onPress={advance}
@@ -182,6 +260,27 @@ export default function Onboarding() {
         </View>
       </KeyboardAvoidingView>
     </ScreenBg>
+  );
+}
+
+function LanguagePill({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => void }) {
+  return (
+    <View style={styles.langPill} testID="onboarding-language-pill">
+      <TouchableOpacity
+        onPress={() => onChange('pt')}
+        style={[styles.langOpt, lang === 'pt' && styles.langOptActive]}
+        testID="onboarding-lang-pt"
+      >
+        <Text style={[styles.langTxt, lang === 'pt' && styles.langTxtActive]}>PT</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => onChange('en')}
+        style={[styles.langOpt, lang === 'en' && styles.langOptActive]}
+        testID="onboarding-lang-en"
+      >
+        <Text style={[styles.langTxt, lang === 'en' && styles.langTxtActive]}>EN</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -230,7 +329,7 @@ function Row({ label, active, onPress, testID, desc, icon }: any) {
   );
 }
 
-function HoursSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+function HoursSlider({ value, onChange, ui }: { value: number; onChange: (v: number) => void; ui: any }) {
   const steps = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4];
   return (
     <View>
@@ -242,8 +341,8 @@ function HoursSlider({ value, onChange }: { value: number; onChange: (v: number)
         ))}
       </View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
-        <Text style={{ color: colors.textDim, fontSize: 12 }}>30 min</Text>
-        <Text style={{ color: colors.textDim, fontSize: 12 }}>4 hours</Text>
+        <Text style={{ color: colors.textDim, fontSize: 12 }}>{ui.hours_min}</Text>
+        <Text style={{ color: colors.textDim, fontSize: 12 }}>{ui.hours_max}</Text>
       </View>
     </View>
   );
@@ -252,7 +351,7 @@ function HoursSlider({ value, onChange }: { value: number; onChange: (v: number)
 function ProgressOrb({ value }: { value: number }) {
   const r = 16, c = 2 * Math.PI * r;
   return (
-    <View style={{ flex: 1, alignItems: 'center' }}>
+    <View style={{ alignItems: 'center' }}>
       <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
         <Svg width={40} height={40}>
           <Circle cx={20} cy={20} r={r} stroke="rgba(255,255,255,0.1)" strokeWidth={3} fill="transparent" />
@@ -271,15 +370,45 @@ function ProgressOrb({ value }: { value: number }) {
 
 const styles = StyleSheet.create({
   headerRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingTop: 60, paddingHorizontal: 16, paddingBottom: 6,
   },
   backBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)' },
-  stepTxt: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
+  stepTxt: { color: colors.textDim, fontSize: 12, fontWeight: '700', flex: 1, textAlign: 'center' },
+
+  // Pílula de idioma fixada no canto superior direito
+  langPill: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(167,139,250,0.35)',
+    borderRadius: 999,
+    padding: 3,
+  },
+  langOpt: {
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+    minWidth: 38,
+    alignItems: 'center',
+  },
+  langOptActive: {
+    backgroundColor: 'rgba(124,58,237,0.55)',
+  },
+  langTxt: {
+    color: colors.textDim,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  langTxtActive: {
+    color: '#fff',
+  },
+
   scroll: { paddingHorizontal: 24, paddingTop: 30, paddingBottom: 30 },
   questionWrap: { minHeight: 320 },
   hint: { color: colors.textAccent, fontSize: 13, letterSpacing: 1.4, fontWeight: '600', textTransform: 'uppercase', marginBottom: 14 },
-  q: { color: colors.text, fontSize: 30, fontWeight: '800', letterSpacing: -1, lineHeight: 38 },
+  q: { color: colors.text, fontSize: 28, fontWeight: '800', letterSpacing: -1, lineHeight: 36 },
   input: {
     backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: colors.border,
     borderRadius: 16, paddingVertical: 16, paddingHorizontal: 18,
