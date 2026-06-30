@@ -23,7 +23,7 @@ config.maxWorkers = 1;
 
 // Aggressive blacklist to reduce file watchers
 config.watchFolders = [__dirname];
-config.resolver.blacklistRE = /(.*)\/(__tests__|android|ios|build|dist|\.git|node_modules\/.*\/(android|ios|windows|macos|__tests__|test|spec|\.git|example|demo|docs|build|dist))(\/.*)?$/;
+config.resolver.blacklistRE = /(.*)\/(__tests__|\.git|node_modules\/.*\/(android|ios|windows|macos|__tests__|test|spec|\.git|example|demo|docs))(\/.*)?$/;
 
 // Ignore node_modules from file watching (huge performance win)
 config.watchPathIgnorePatterns = [
