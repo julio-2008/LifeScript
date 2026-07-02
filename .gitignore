@@ -102,3 +102,4 @@ credentials.json
 *.key
 .credentials
 .metro-cache/
+frontend copy/
