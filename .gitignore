@@ -1,4 +1,19 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+node_modules/
+.expo/
+.expo-shared/
+.env
+.env.local
+.DS_Store
+dist/
+build/
+.vscode/
+android/
+ios/
+*.log
+/.expo/
+/.history/
+.parcel-cache/
+*.keystore# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # IDE and editors
 .idea/
@@ -86,3 +101,4 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+.metro-cache/

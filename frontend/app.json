@@ -15,7 +15,8 @@
         "UIBackgroundModes": [
           "audio"
         ]
-      }
+      },
+      "bundleIdentifier": "com.emergent.lifescripthub.j4vbcs"
     },
     "android": {
       "adaptiveIcon": {
@@ -26,7 +27,8 @@
       "permissions": [
         "NOTIFICATIONS",
         "SCHEDULE_EXACT_ALARM"
-      ]
+      ],
+      "package": "com.emergent.lifescripthub.j4vbcs"
     },
     "web": {
       "bundler": "metro",

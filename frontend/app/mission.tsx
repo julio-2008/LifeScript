@@ -201,7 +201,7 @@ export default function MissionScreen() {
       return;
     }
 
-    router.replace('/(tabs)');
+    router.replace('/loot');
   };
 
   return (
