@@ -31,7 +31,7 @@
       "package": "com.emergent.lifescripthub.j4vbcs"
     },
     "web": {
-      "bundler": "metro",
+      "bundler": "webpack",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
